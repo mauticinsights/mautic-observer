@@ -1,0 +1,813 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Minimal Mautic definitions for PHPStan in this repo (mautic/core-lib is not installed).
+ *
+ * @see https://phpstan.org/user-guide/stub-files
+ */
+
+namespace Mautic\ConfigBundle;
+
+final class ConfigEvents
+{
+    public const CONFIG_PRE_SAVE = 'mautic.config.pre_save';
+}
+
+namespace Mautic\ConfigBundle\Event;
+
+class ConfigEvent
+{
+    /**
+     * @param array<string, mixed> $configs
+     */
+    public function __construct(private array $configs = [])
+    {
+    }
+
+    public function getConfig(string $key)
+    {
+        return $this->configs[$key] ?? [];
+    }
+}
+
+namespace Mautic\CoreBundle\Helper;
+
+class AppVersion
+{
+    public function getVersion(): string
+    {
+        return '';
+    }
+}
+
+class CoreParametersHelper
+{
+    public function get(string $name)
+    {
+        return null;
+    }
+}
+
+class EncryptionHelper
+{
+    /**
+     * @return mixed|false
+     */
+    public function decrypt($key, bool $mainDecryptOnly = false)
+    {
+        return $key;
+    }
+}
+
+namespace Mautic\CoreBundle\Form\Type;
+
+class YesNoButtonGroupType
+{
+}
+
+namespace Mautic\IntegrationsBundle\Integration\Interfaces;
+
+interface ConfigFormFeatureSettingsInterface
+{
+    public function getFeatureSettingsConfigFormName(): string;
+}
+
+namespace Mautic\IntegrationsBundle\Integration;
+
+use Mautic\PluginBundle\Entity\Integration;
+
+class BasicIntegration
+{
+    public function setIntegrationSettings(Integration $integration): void
+    {
+    }
+}
+
+namespace Mautic\PluginBundle\Entity;
+
+class Integration
+{
+    /**
+     * @return array<string, mixed>
+     */
+    public function getFeatureSettings(): array
+    {
+        return [];
+    }
+
+    public function getIsPublished(): bool
+    {
+        return false;
+    }
+
+    public function getName(): string
+    {
+        return '';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getApiKeys(): array
+    {
+        return [];
+    }
+}
+
+namespace Mautic\PluginBundle;
+
+final class PluginEvents
+{
+    public const PLUGIN_ON_INTEGRATION_CONFIG_SAVE = 'mautic.plugin_on_integration_config_save';
+}
+
+namespace Mautic\PluginBundle\Event;
+
+use Mautic\PluginBundle\Entity\Integration;
+
+class PluginIntegrationEvent
+{
+    public function __construct(private Integration $integration)
+    {
+    }
+
+    public function getEntity(): Integration
+    {
+        return $this->integration;
+    }
+}
+
+namespace Mautic\IntegrationsBundle;
+
+final class IntegrationEvents
+{
+    public const INTEGRATION_CONFIG_AFTER_SAVE = 'mautic.integration_config_after_save';
+}
+
+namespace Mautic\IntegrationsBundle\Event;
+
+use Mautic\PluginBundle\Entity\Integration;
+
+class ConfigSaveEvent
+{
+    public function __construct(private Integration $integration)
+    {
+    }
+
+    public function getIntegrationConfiguration(): Integration
+    {
+        return $this->integration;
+    }
+}
+
+namespace Mautic\CampaignBundle\Entity;
+
+class Campaign
+{
+    public ?\DateTimeInterface $deleted = null;
+
+    public function getId(): ?int
+    {
+        return null;
+    }
+
+    public function getDeletedId(): ?int
+    {
+        return null;
+    }
+
+    public function getName(): string
+    {
+        return '';
+    }
+
+    public function isPublished(): bool
+    {
+        return false;
+    }
+}
+
+namespace Mautic\LeadBundle\Entity;
+
+class Lead
+{
+    public ?\DateTimeInterface $dateIdentified = null;
+
+    public function getId(): ?int
+    {
+        return null;
+    }
+
+    public function getDeletedId(): ?int
+    {
+        return null;
+    }
+
+    public function isAnonymous(): bool
+    {
+        return false;
+    }
+
+    public function getEmail(): ?string
+    {
+        return null;
+    }
+
+    /**
+     * @param bool $lastFirst
+     */
+    public function getPrimaryIdentifier($lastFirst = false): ?string
+    {
+        return null;
+    }
+
+    public function getCompany(): ?string
+    {
+        return null;
+    }
+
+    public function getFirstname(): ?string
+    {
+        return null;
+    }
+
+    public function getLastname(): ?string
+    {
+        return null;
+    }
+
+    /**
+     * @return iterable<object>
+     */
+    public function getTags(): iterable
+    {
+        return [];
+    }
+}
+
+class LeadList
+{
+    public ?int $deletedId = null;
+
+    public function getId(): ?int
+    {
+        return null;
+    }
+
+    public function getDeletedId(): ?int
+    {
+        return null;
+    }
+
+    public function getName(): string
+    {
+        return '';
+    }
+
+    public function getAlias(): string
+    {
+        return '';
+    }
+
+    public function getPublicName(): ?string
+    {
+        return null;
+    }
+
+    public function getIsPublished(): bool
+    {
+        return false;
+    }
+}
+
+namespace Mautic\LeadBundle\Model;
+
+use Mautic\LeadBundle\Entity\Lead;
+
+class LeadModel
+{
+    /**
+     * @return list<array<string, mixed>|object>
+     */
+    public function getLists(Lead $lead, bool $forLists = false, bool $arrayHydration = false, bool $isPublic = false, bool $isPreferenceCenter = false): array
+    {
+        return [];
+    }
+}
+
+namespace Mautic\EmailBundle\Entity;
+
+use Mautic\LeadBundle\Entity\Lead;
+use Mautic\LeadBundle\Entity\LeadList;
+
+class Email
+{
+    public function getId(): ?int
+    {
+        return null;
+    }
+
+    public function getDeletedId(): ?int
+    {
+        return null;
+    }
+
+    public function getName(): string
+    {
+        return '';
+    }
+
+    public function getSubject(): string
+    {
+        return '';
+    }
+
+    public function getEmailType(): string
+    {
+        return 'template';
+    }
+
+    public function getIsPublished(): bool
+    {
+        return false;
+    }
+
+    /**
+     * @return iterable<LeadList>
+     */
+    public function getLists()
+    {
+        return [];
+    }
+}
+
+class Stat
+{
+    public function getEmail(): ?Email
+    {
+        return null;
+    }
+
+    public function getLead(): ?Lead
+    {
+        return null;
+    }
+
+    public function getSource(): ?string
+    {
+        return null;
+    }
+
+    public function getSourceId(): ?int
+    {
+        return null;
+    }
+
+    public function getList(): ?LeadList
+    {
+        return null;
+    }
+}
+
+namespace Mautic\EmailBundle;
+
+final class EmailEvents
+{
+    public const EMAIL_ON_SEND = 'mautic.email.on_send';
+
+    public const EMAIL_ON_OPEN = 'mautic.email.on_open';
+
+    public const EMAIL_ON_DISPLAY = 'mautic.email_on_display';
+
+    public const EMAIL_ON_REPLY = 'mautic.email_on_reply';
+
+    public const EMAIL_FAILED = 'mautic.on_email_failed';
+
+    public const EMAIL_RESEND = 'mautic.on_email_resend';
+
+    public const ON_SENT_EMAIL_TO_USER = 'mautic.email.on_sent_email_to_user';
+
+    public const ON_TRANSPORT_WEBHOOK = 'mautic.email.on_transport_webhook';
+
+    public const EMAIL_POST_SAVE = 'mautic.email_post_save';
+
+    public const EMAIL_POST_DELETE = 'mautic.email_post_delete';
+}
+
+namespace Mautic\EmailBundle\Event;
+
+use Mautic\EmailBundle\Entity\Email;
+use Mautic\EmailBundle\Entity\Stat;
+use Mautic\LeadBundle\Entity\Lead;
+
+class EmailEvent
+{
+    public function __construct(private Email $email, private bool $isNew = false)
+    {
+    }
+
+    public function getEmail(): Email
+    {
+        return $this->email;
+    }
+
+    public function isNew(): bool
+    {
+        return $this->isNew;
+    }
+}
+
+class EmailSendEvent
+{
+    public function isInternalSend(): bool
+    {
+        return false;
+    }
+
+    /**
+     * @return Lead|array<string, mixed>|null
+     */
+    public function getLead()
+    {
+        return null;
+    }
+
+    public function getEmail(): ?Email
+    {
+        return null;
+    }
+
+    /**
+     * @return array<int, mixed>
+     */
+    public function getSource(): array
+    {
+        return [];
+    }
+}
+
+class EmailOpenEvent
+{
+    public function getEmail(): ?Email
+    {
+        return null;
+    }
+
+    public function getStat(): Stat
+    {
+        return new Stat();
+    }
+
+    public function isFirstTime(): bool
+    {
+        return false;
+    }
+}
+
+class QueueEmailEvent
+{
+    public function getMessage(): \Mautic\EmailBundle\Mailer\Message\MauticMessage
+    {
+        return new \Mautic\EmailBundle\Mailer\Message\MauticMessage();
+    }
+}
+
+class TransportWebhookEvent
+{
+    public function __construct(private \Symfony\Component\HttpFoundation\Request $request)
+    {
+    }
+
+    public function getRequest(): \Symfony\Component\HttpFoundation\Request
+    {
+        return $this->request;
+    }
+}
+
+namespace Mautic\EmailBundle\Mailer\Message;
+
+class MauticMessage
+{
+    public function getLeadIdHash(): ?string
+    {
+        return null;
+    }
+
+    public function getSubject(): string
+    {
+        return '';
+    }
+
+    /**
+     * @return list<object>
+     */
+    public function getFrom(): array
+    {
+        return [];
+    }
+
+    /**
+     * @return list<object>
+     */
+    public function getTo(): array
+    {
+        return [];
+    }
+}
+
+namespace Mautic\PointBundle\Entity;
+
+class TriggerEvent
+{
+    public function getId(): ?int
+    {
+        return null;
+    }
+
+    public function getName(): string
+    {
+        return '';
+    }
+
+    public function getType(): string
+    {
+        return '';
+    }
+}
+
+namespace Mautic\PointBundle\Event;
+
+use Mautic\LeadBundle\Entity\Lead;
+use Mautic\PointBundle\Entity\TriggerEvent;
+
+class TriggerExecutedEvent
+{
+    public function getLead(): Lead
+    {
+        return new Lead();
+    }
+
+    public function getTriggerEvent(): TriggerEvent
+    {
+        return new TriggerEvent();
+    }
+}
+
+namespace Mautic\LeadBundle;
+
+final class LeadEvents
+{
+    public const LEAD_POST_SAVE = 'mautic.lead_post_save';
+
+    public const LEAD_PRE_DELETE = 'mautic.lead_pre_delete';
+
+    public const LEAD_POST_DELETE = 'mautic.lead_post_delete';
+
+    public const LEAD_POINTS_CHANGE = 'mautic.lead_points_change';
+
+    public const LEAD_LIST_CHANGE = 'mautic.lead_list_change';
+
+    public const LEAD_IDENTIFIED = 'mautic.lead_identified';
+
+    public const LIST_POST_SAVE = 'mautic.lead_list_post_save';
+
+    public const LIST_POST_DELETE = 'mautic.lead_list_post_delete';
+}
+
+namespace Mautic\LeadBundle\Event;
+
+use Mautic\LeadBundle\Entity\Lead;
+use Mautic\LeadBundle\Entity\LeadList;
+
+class LeadEvent
+{
+    public function __construct(
+        private Lead $lead,
+        private bool $isNew = false,
+    ) {
+    }
+
+    public function isNew(): bool
+    {
+        return $this->isNew;
+    }
+
+    public function getLead(): Lead
+    {
+        return $this->lead;
+    }
+}
+
+class LeadListEvent extends \Symfony\Contracts\EventDispatcher\Event
+{
+    public function __construct(
+        private LeadList $list,
+        private bool $isNew = false,
+    ) {
+    }
+
+    public function getList(): LeadList
+    {
+        return $this->list;
+    }
+
+    public function isNew(): bool
+    {
+        return $this->isNew;
+    }
+}
+
+class PointsChangeEvent
+{
+    public function __construct(
+        private Lead $lead,
+        private int $oldPoints,
+        private int $newPoints,
+    ) {
+    }
+
+    public function getLead(): Lead
+    {
+        return $this->lead;
+    }
+
+    public function getOldPoints(): int
+    {
+        return $this->oldPoints;
+    }
+
+    public function getNewPoints(): int
+    {
+        return $this->newPoints;
+    }
+}
+
+class ListChangeEvent extends \Symfony\Contracts\EventDispatcher\Event
+{
+    private ?Lead $lead = null;
+
+    /** @var list<Lead>|null */
+    private ?array $leads = null;
+
+    /**
+     * @param Lead|list<Lead> $leadsOrLead
+     */
+    public function __construct(
+        Lead|array $leadsOrLead,
+        private LeadList $list,
+        private bool $added = true,
+    ) {
+        if (\is_array($leadsOrLead)) {
+            $this->leads = $leadsOrLead;
+        } else {
+            $this->lead = $leadsOrLead;
+        }
+    }
+
+    public function getLead(): ?Lead
+    {
+        return $this->lead;
+    }
+
+    /**
+     * @return list<Lead>|null
+     */
+    public function getLeads(): ?array
+    {
+        return $this->leads;
+    }
+
+    public function getList(): LeadList
+    {
+        return $this->list;
+    }
+
+    public function wasAdded(): bool
+    {
+        return $this->added;
+    }
+}
+
+namespace Mautic\PageBundle;
+
+final class PageEvents
+{
+    public const PAGE_ON_HIT = 'mautic.page_on_hit';
+}
+
+namespace Mautic\PageBundle\Entity;
+
+class Page
+{
+    public function __construct(
+        private ?int $id = null,
+    ) {
+    }
+
+    public function getId(): ?int
+    {
+        return $this->id;
+    }
+}
+
+class Hit
+{
+    public function __construct(
+        private ?Page $page = null,
+        private ?\Mautic\LeadBundle\Entity\Lead $lead = null,
+    ) {
+    }
+
+    public function getPage(): ?Page
+    {
+        return $this->page;
+    }
+
+    public function getLead(): ?\Mautic\LeadBundle\Entity\Lead
+    {
+        return $this->lead;
+    }
+}
+
+namespace Mautic\PageBundle\Event;
+
+use Mautic\PageBundle\Entity\Hit;
+use Mautic\PageBundle\Entity\Page;
+
+class PageHitEvent
+{
+    public function __construct(
+        private Hit $hit,
+    ) {
+    }
+
+    public function getHit(): Hit
+    {
+        return $this->hit;
+    }
+
+    public function getPage(): ?Page
+    {
+        return $this->hit->getPage();
+    }
+}
+
+namespace Mautic\FormBundle;
+
+final class FormEvents
+{
+    public const FORM_ON_SUBMIT = 'mautic.form_on_submit';
+}
+
+namespace Mautic\FormBundle\Entity;
+
+class Form
+{
+    public function __construct(
+        private ?int $id = null,
+    ) {
+    }
+
+    public function getId(): ?int
+    {
+        return $this->id;
+    }
+}
+
+class Submission
+{
+    public function __construct(
+        private ?Form $form = null,
+        private ?\Mautic\LeadBundle\Entity\Lead $lead = null,
+    ) {
+    }
+
+    public function getForm(): ?Form
+    {
+        return $this->form;
+    }
+
+    public function getLead(): ?\Mautic\LeadBundle\Entity\Lead
+    {
+        return $this->lead;
+    }
+}
+
+namespace Mautic\FormBundle\Event;
+
+use Mautic\FormBundle\Entity\Submission;
+
+class SubmissionEvent
+{
+    public function __construct(
+        private Submission $submission,
+    ) {
+    }
+
+    public function getSubmission(): Submission
+    {
+        return $this->submission;
+    }
+}

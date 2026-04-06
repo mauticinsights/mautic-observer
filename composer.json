@@ -1,0 +1,56 @@
+{
+    "name": "mauticinsights/mautic-observer",
+    "description": "Mautic Insights — plugin for Mautic 5.x",
+    "version": "1.0.0",
+    "type": "mautic-plugin",
+    "license": "proprietary",
+    "keywords": [
+        "mautic",
+        "plugin"
+    ],
+    "extra": {
+        "install-directory-name": "MauticInsightsBundle"
+    },
+    "require": {
+        "php": ">=8.0"
+    },
+    "suggest": {
+        "mautic/core-lib": "Mautic 5.x core (required in production; not installed in this repo for standalone dev tooling).",
+        "ext-redis": "Optional: Redis fallback for the API event buffer when the filesystem cache directory is not writable."
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.59",
+        "phpunit/phpunit": "^9.6",
+        "symfony/http-client": "^6.4",
+        "doctrine/dbal": "^3.8",
+        "phpstan/phpstan": "^1.12",
+        "symfony/dependency-injection": "^6.0",
+        "symfony/config": "^6.0",
+        "symfony/http-kernel": "^6.0",
+        "doctrine/orm": "^2.14"
+    },
+    "autoload": {
+        "psr-4": {
+            "MauticPlugin\\MauticInsightsBundle\\": ""
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "MauticPlugin\\MauticInsightsBundle\\Tests\\": "Tests/",
+            "Mautic\\": "Tests/Stubs/Mautic/"
+        }
+    },
+    "scripts": {
+        "cs-fixer": "php-cs-fixer fix",
+        "cs-check": "php-cs-fixer fix --dry-run --diff",
+        "test": "phpunit",
+        "phpstan": "phpstan analyse -c phpstan.neon.dist --no-progress --memory-limit=512M",
+        "ci": [
+            "@cs-check",
+            "@phpstan",
+            "@test"
+        ]
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}

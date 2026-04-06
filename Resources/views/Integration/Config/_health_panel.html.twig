@@ -1,0 +1,74 @@
+{% set health = mautic_insights_health() %}
+<div class="table-responsive">
+    <table class="table table-bordered table-condensed">
+        <tbody>
+            <tr>
+                <th scope="row" class="col-xs-4">{{ 'mautic.mauticinsights.health.mautic_version'|trans }}</th>
+                <td>{{ health.mautic_version }}</td>
+            </tr>
+            <tr>
+                <th scope="row">{{ 'mautic.mauticinsights.health.plugin_version'|trans }}</th>
+                <td>{{ health.plugin_version }}</td>
+            </tr>
+            <tr>
+                <th scope="row">{{ 'mautic.mauticinsights.health.last_api'|trans }}</th>
+                <td>
+                    {% if not health.last_api.present %}
+                        <span class="text-muted">{{ 'mautic.mauticinsights.health.last_api.none'|trans }}</span>
+                    {% elseif health.last_api.ok %}
+                        <span class="label label-success">{{ 'mautic.mauticinsights.health.last_api.ok'|trans }}</span>
+                    {% else %}
+                        <span class="label label-danger">{{ 'mautic.mauticinsights.health.last_api.fail'|trans }}</span>
+                    {% endif %}
+                    {% if health.last_api.present %}
+                        <span class="text-muted small"> · HTTP {{ health.last_api.http_status }} · {{ health.last_api.method }} {{ health.last_api.url }}</span>
+                        {% if health.last_api.at is not empty %}
+                            <br/><span class="text-muted small">{{ health.last_api.at }}</span>
+                        {% endif %}
+                        {% if health.last_api.error %}
+                            <br/><span class="text-danger small">{{ health.last_api.error }}</span>
+                        {% endif %}
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">{{ 'mautic.mauticinsights.health.buffering'|trans }}</th>
+                <td>
+                    {% if not health.buffering.durable_enabled %}
+                        {{ 'mautic.mauticinsights.health.buffering.off'|trans }}
+                    {% elseif health.buffering.backend_key is empty %}
+                        {{ 'mautic.mauticinsights.health.buffering.on_no_backend'|trans }}
+                    {% else %}
+                        {{ 'mautic.mauticinsights.health.buffering.on'|trans }}
+                        —
+                        {% if health.buffering.backend_key == 'file' %}
+                            {{ 'mautic.mauticinsights.health.buffering.backend.file'|trans }}
+                        {% elseif health.buffering.backend_key == 'redis' %}
+                            {{ 'mautic.mauticinsights.health.buffering.backend.redis'|trans }}
+                        {% elseif health.buffering.backend_key == 'database' %}
+                            {{ 'mautic.mauticinsights.health.buffering.backend.database'|trans }}
+                        {% else %}
+                            {{ health.buffering.backend_key }}
+                        {% endif %}
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">{{ 'mautic.mauticinsights.health.counts.contacts'|trans }}</th>
+                <td>{{ health.counts.contacts }}</td>
+            </tr>
+            <tr>
+                <th scope="row">{{ 'mautic.mauticinsights.health.counts.emails'|trans }}</th>
+                <td>{{ health.counts.emails }}</td>
+            </tr>
+            <tr>
+                <th scope="row">{{ 'mautic.mauticinsights.health.counts.segments'|trans }}</th>
+                <td>{{ health.counts.segments }}</td>
+            </tr>
+            <tr>
+                <th scope="row">{{ 'mautic.mauticinsights.health.counts.campaigns'|trans }}</th>
+                <td>{{ health.counts.campaigns }}</td>
+            </tr>
+        </tbody>
+    </table>
+</div>

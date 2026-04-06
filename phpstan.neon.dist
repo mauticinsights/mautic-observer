@@ -1,0 +1,30 @@
+# PHPStan for standalone dev (mautic/core-lib is not installed).
+# Mautic framework classes come from phpstan/stubs/mautic-stubs.php; Plugin Integration from Tests/Stubs (autoload-dev).
+# Config/services.php still references MauticCoreExtension — excluded.
+
+parameters:
+    level: 6
+    phpVersion: 80000
+    tmpDir: .phpstan-cache
+    # Doctrine DBAL connection params include Mautic-specific keys (e.g. table_prefix) not in generic PHPDoc shapes.
+    treatPhpDocTypesAsCertain: false
+    paths:
+        - InsightsApiConfig.php
+        - DependencyInjection
+        - EventSubscriber
+        - Service
+        - Tests
+    bootstrapFiles:
+        - phpstan/bootstrap-mautic-stubs.php
+    excludePaths:
+        analyse:
+            - Config/services.php
+    ignoreErrors:
+        # table_prefix is Mautic-specific; DBAL getParams() PHPDoc omits it so PHPStan thinks $prefix is always ''.
+        -
+            identifier: notIdentical.alwaysFalse
+            path: Service/DatabaseEventBuffer.php
+        # Untyped $message / $level match psr/log 1.x LoggerInterface (production Mautic may resolve older psr/log).
+        -
+            identifier: missingType.parameter
+            path: Service/InsightsPluginLogger.php
