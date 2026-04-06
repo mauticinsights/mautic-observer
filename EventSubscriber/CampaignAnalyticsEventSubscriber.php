@@ -1,0 +1,289 @@
+<?php
+
+declare(strict_types=1);
+
+namespace MauticPlugin\MauticInsightsBundle\EventSubscriber;
+
+use Mautic\CampaignBundle\CampaignEvents;
+use Mautic\CampaignBundle\Entity\LeadEventLog;
+use Mautic\CampaignBundle\Event\CampaignEvent;
+use Mautic\CampaignBundle\Event\CampaignLeadChangeEvent;
+use Mautic\CampaignBundle\Event\ExecutedBatchEvent;
+use Mautic\CampaignBundle\Event\ExecutedEvent;
+use Mautic\CampaignBundle\Event\FailedEvent;
+use Mautic\CampaignBundle\Event\ScheduledEvent;
+use MauticPlugin\MauticInsightsBundle\Service\DeferredOutboundEventQueue;
+use MauticPlugin\MauticInsightsBundle\Service\MauticEventBuffer;
+use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+
+/**
+ * Campaigns → Insights event buffer (same outbound channel as lead/email events).
+ *
+ * {@see CampaignEvents::CAMPAIGN_POST_SAVE} and {@see CampaignEvents::CAMPAIGN_POST_DELETE} use the shared
+ * {@see DeferredOutboundEventQueue} (like lead save/delete) so they batch on flush; other handlers use {@see MauticEventBuffer::push()} directly.
+ *
+ * @see CampaignEvents
+ */
+final class CampaignAnalyticsEventSubscriber implements EventSubscriberInterface
+{
+    public function __construct(
+        private MauticEventBuffer $eventBuffer,
+        private DeferredOutboundEventQueue $deferredCampaignOutboundQueue,
+    ) {
+    }
+
+    public static function getSubscribedEvents(): array
+    {
+        return [
+            CampaignEvents::CAMPAIGN_POST_SAVE => ['onCampaignPostSave', 0],
+            CampaignEvents::CAMPAIGN_POST_DELETE => ['onCampaignPostDelete', 0],
+            CampaignEvents::CAMPAIGN_ON_LEADCHANGE => ['onCampaignLeadChange', 0],
+            CampaignEvents::ON_EVENT_EXECUTED => ['onEventExecuted', 0],
+            CampaignEvents::ON_EVENT_EXECUTED_BATCH => ['onEventExecutedBatch', 0],
+            CampaignEvents::ON_EVENT_FAILED => ['onEventFailed', 0],
+            CampaignEvents::ON_EVENT_SCHEDULED => ['onEventScheduled', 0],
+        ];
+    }
+
+    public function onCampaignPostSave(CampaignEvent $event): void
+    {
+        $campaign = $event->getCampaign();
+        $id = $this->resolvePositiveCampaignId($campaign);
+        if (null === $id) {
+            return;
+        }
+
+        $this->deferredCampaignOutboundQueue->enqueue(CampaignEvents::CAMPAIGN_POST_SAVE, [
+            'campaign_id' => $id,
+            'properties' => [
+                'name' => $campaign->getName(),
+                'operation' => $event->isNew() ? 'created' : 'updated',
+                'is_published' => $campaign->isPublished(),
+            ],
+        ]);
+    }
+
+    public function onCampaignPostDelete(CampaignEvent $event): void
+    {
+        $campaign = $event->getCampaign();
+        $id = $this->resolvePositiveCampaignId($campaign);
+        if (null === $id) {
+            return;
+        }
+
+        $this->deferredCampaignOutboundQueue->enqueue(CampaignEvents::CAMPAIGN_POST_DELETE, [
+            'campaign_id' => $id,
+            'properties' => [
+                'name' => $campaign->getName(),
+            ],
+        ]);
+    }
+
+    /**
+     * After DB delete, {@see \Mautic\CoreBundle\Model\FormModel::deleteEntity()} clears {@code getId()} and sets {@see \Mautic\CoreBundle\Entity\FormEntity::$deletedId}.
+     */
+    private function resolvePositiveCampaignId(object $campaign): ?int
+    {
+        $candidates = [];
+        if (method_exists($campaign, 'getId')) {
+            $candidates[] = $campaign->getId();
+        }
+        if (method_exists($campaign, 'getDeletedId')) {
+            $candidates[] = $campaign->getDeletedId();
+        }
+        if (property_exists($campaign, 'deletedId')) {
+            $vars = \get_object_vars($campaign);
+            if (\array_key_exists('deletedId', $vars)) {
+                $candidates[] = $vars['deletedId'];
+            }
+        }
+
+        foreach ($candidates as $raw) {
+            if (null === $raw) {
+                continue;
+            }
+            if (\is_int($raw)) {
+                if ($raw > 0) {
+                    return $raw;
+                }
+
+                continue;
+            }
+            if (\is_string($raw) && is_numeric($raw)) {
+                $n = (int) $raw;
+                if ($n > 0) {
+                    return $n;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    public function onCampaignLeadChange(CampaignLeadChangeEvent $event): void
+    {
+        $action = $event->getAction();
+        if (null === $action || '' === $action) {
+            return;
+        }
+
+        $campaign = $event->getCampaign();
+        $campaignId = $campaign->getId();
+        if (null === $campaignId) {
+            return;
+        }
+
+        $eventName = 'campaign.'.$action;
+        $leads = $event->getLeads();
+        if (null !== $leads && [] !== $leads) {
+            foreach ($leads as $lead) {
+                $this->pushCampaignLeadMembership($eventName, $lead->getId(), $campaignId);
+            }
+
+            return;
+        }
+
+        $lead = $event->getLead();
+        if (null === $lead) {
+            return;
+        }
+
+        $this->pushCampaignLeadMembership($eventName, $lead->getId(), $campaignId);
+    }
+
+    public function onEventExecuted(ExecutedEvent $event): void
+    {
+        $this->pushStepExecutedFromLog($event->getLog());
+    }
+
+    public function onEventExecutedBatch(ExecutedBatchEvent $event): void
+    {
+        foreach ($event->getExecuted() as $log) {
+            $this->pushStepExecutedFromLog($log);
+        }
+    }
+
+    public function onEventFailed(FailedEvent $event): void
+    {
+        $this->pushStepFailedFromLog($event->getLog());
+    }
+
+    public function onEventScheduled(ScheduledEvent $event): void
+    {
+        $this->pushStepScheduledFromLog($event);
+    }
+
+    private function pushCampaignLeadMembership(string $eventName, ?int $contactId, int $campaignId): void
+    {
+        if (null === $contactId) {
+            return;
+        }
+
+        $this->eventBuffer->push($eventName, [
+            'channel' => 'campaign',
+            'contact_id' => $contactId,
+            'campaign_id' => $campaignId,
+        ]);
+    }
+
+    private function pushStepExecutedFromLog(LeadEventLog $log): void
+    {
+        $lead = $log->getLead();
+        $campaign = $log->getCampaign();
+        $eventEntity = $log->getEvent();
+        if (null === $lead || null === $campaign || null === $eventEntity) {
+            return;
+        }
+
+        $leadId = $lead->getId();
+        $campaignId = $campaign->getId();
+        if (!$leadId || !$campaignId) {
+            return;
+        }
+
+        $data = [
+            'channel' => 'campaign',
+            'contact_id' => $leadId,
+            'campaign_id' => $campaignId,
+            'properties' => [
+                'step_type' => $eventEntity->getType(),
+                'step_name' => $eventEntity->getName(),
+            ],
+        ];
+
+        $triggered = $log->getDateTriggered();
+        if (null !== $triggered) {
+            $data['ts'] = $triggered->format(\DATE_ATOM);
+        }
+
+        $this->eventBuffer->push('campaign.step_executed', $data);
+    }
+
+    private function pushStepFailedFromLog(LeadEventLog $log): void
+    {
+        $lead = $log->getLead();
+        $campaign = $log->getCampaign();
+        $eventEntity = $log->getEvent();
+        if (null === $lead || null === $campaign || null === $eventEntity) {
+            return;
+        }
+
+        $leadId = $lead->getId();
+        $campaignId = $campaign->getId();
+        if (!$leadId || !$campaignId) {
+            return;
+        }
+
+        $data = [
+            'channel' => 'campaign',
+            'contact_id' => $leadId,
+            'campaign_id' => $campaignId,
+            'properties' => [
+                'step_type' => $eventEntity->getType(),
+                'step_name' => $eventEntity->getName(),
+            ],
+        ];
+
+        $triggered = $log->getDateTriggered();
+        if (null !== $triggered) {
+            $data['ts'] = $triggered->format(\DATE_ATOM);
+        }
+
+        $this->eventBuffer->push('campaign.step_failed', $data);
+    }
+
+    private function pushStepScheduledFromLog(ScheduledEvent $event): void
+    {
+        $log = $event->getLog();
+        $lead = $log->getLead();
+        $campaign = $log->getCampaign();
+        $eventEntity = $log->getEvent();
+        if (null === $lead || null === $campaign || null === $eventEntity) {
+            return;
+        }
+
+        $leadId = $lead->getId();
+        $campaignId = $campaign->getId();
+        if (!$leadId || !$campaignId) {
+            return;
+        }
+
+        $data = [
+            'channel' => 'campaign',
+            'contact_id' => $leadId,
+            'campaign_id' => $campaignId,
+            'properties' => [
+                'step_type' => $eventEntity->getType(),
+                'step_name' => $eventEntity->getName(),
+                'is_reschedule' => $event->isReschedule(),
+            ],
+        ];
+
+        $when = $log->getTriggerDate();
+        if (null !== $when) {
+            $data['ts'] = $when->format(\DATE_ATOM);
+        }
+
+        $this->eventBuffer->push('campaign.step_scheduled', $data);
+    }
+}

@@ -1,0 +1,20 @@
+{# Overrides Core form_help only when the field sets attr data-mauticinsights-raw-help (see AuthConfigType). #}
+{% block form_help -%}
+    {%- if help is not empty or form.vars.attr.help_icon is defined -%}
+        {%- set help_attr = help_attr|merge({class: (help_attr.class|default('') ~ ' help-block')|trim}) -%}
+        <p id="{{ id }}_help"{% with { attr: help_attr } %}{{ block('attributes') }}{% endwith %}>
+            {%- if form.vars.attr.help_icon is defined and form.vars.attr.help_icon is not empty -%}
+                <i class="{{ form.vars.attr.help_icon }} ri-lg mr-xs"></i>
+            {%- endif -%}
+            {%- if help is not empty -%}
+                {%- if help_html is same as(false) -%}
+                    {{- help|trans(help_translation_parameters, translation_domain) -}}
+                {%- elseif form.vars.attr['data-mauticinsights-raw-help'] is defined -%}
+                    {{- help|trans(help_translation_parameters, translation_domain)|raw -}}
+                {%- else -%}
+                    {{- help|trans(help_translation_parameters, translation_domain)|purify -}}
+                {%- endif -%}
+            {%- endif -%}
+        </p>
+    {%- endif -%}
+{%- endblock form_help %}
