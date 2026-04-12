@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace MauticPlugin\MauticInsightsBundle\Tests;
 
 use Mautic\PluginBundle\Entity\Integration;
+use MauticPlugin\MauticInsightsBundle\Buffer\DisabledPersistentEventBuffer;
+use MauticPlugin\MauticInsightsBundle\Buffer\MauticEventBuffer;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
-use MauticPlugin\MauticInsightsBundle\Service\DisabledPersistentEventBuffer;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsHttpTokenResolver;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPublishedIntegrationFinder;
-use MauticPlugin\MauticInsightsBundle\Service\MauticEventBuffer;
 use MauticPlugin\MauticInsightsBundle\Service\NoopInsightsApiSendGate;
 use MauticPlugin\MauticInsightsBundle\Service\ResilientEventSender;
 use PHPUnit\Framework\TestCase;

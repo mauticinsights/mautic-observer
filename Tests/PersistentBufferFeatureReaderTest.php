@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace MauticPlugin\MauticInsightsBundle\Tests;
 
 use Mautic\PluginBundle\Entity\Integration;
+use MauticPlugin\MauticInsightsBundle\Buffer\PersistentBufferFeatureReader;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPublishedIntegrationFinder;
-use MauticPlugin\MauticInsightsBundle\Service\PersistentBufferFeatureReader;
 use PHPUnit\Framework\TestCase;
 
 final class PersistentBufferFeatureReaderTest extends TestCase

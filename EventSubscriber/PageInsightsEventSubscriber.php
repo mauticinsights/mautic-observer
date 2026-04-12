@@ -7,7 +7,7 @@ namespace MauticPlugin\MauticInsightsBundle\EventSubscriber;
 use Mautic\LeadBundle\Entity\Lead;
 use Mautic\PageBundle\Event\PageHitEvent;
 use Mautic\PageBundle\PageEvents;
-use MauticPlugin\MauticInsightsBundle\Service\DeferredOutboundEventQueue;
+use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
 use MauticPlugin\MauticInsightsBundle\Service\LeadInsightsContextBuilder;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 

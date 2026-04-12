@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace MauticPlugin\MauticInsightsBundle\Tests\EventSubscriber;
 
+use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
 use MauticPlugin\MauticInsightsBundle\EventSubscriber\EventBufferFlushSubscriber;
-use MauticPlugin\MauticInsightsBundle\Service\DeferredOutboundEventQueue;
 use MauticPlugin\MauticInsightsBundle\Service\NoopInsightsApiSendGate;
 use MauticPlugin\MauticInsightsBundle\Tests\Support\CapturingBufferTestSupport;
 use PHPUnit\Framework\TestCase;

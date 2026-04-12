@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace MauticPlugin\MauticInsightsBundle\Service;
+namespace MauticPlugin\MauticInsightsBundle\Buffer;
 
 /**
  * Tries {@see FileEventBuffer}, then {@see RedisEventBuffer}, then {@see DatabaseEventBuffer}.

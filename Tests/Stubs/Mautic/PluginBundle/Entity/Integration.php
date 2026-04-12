@@ -7,7 +7,7 @@ namespace Mautic\PluginBundle\Entity;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
 
 /**
- * Minimal stub for {@see \MauticPlugin\MauticInsightsBundle\Service\MauticEventBuffer} tests (no mautic/core-lib in this repo).
+ * Minimal stub for {@see \MauticPlugin\MauticInsightsBundle\Buffer\MauticEventBuffer} tests (no mautic/core-lib in this repo).
  */
 final class Integration
 {

@@ -2,11 +2,15 @@
 
 declare(strict_types=1);
 
-namespace MauticPlugin\MauticInsightsBundle\Service;
+namespace MauticPlugin\MauticInsightsBundle\Buffer;
 
 use DateTimeImmutable;
 use DateTimeZone;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
+use MauticPlugin\MauticInsightsBundle\Service\InsightsApiSendGate;
+use MauticPlugin\MauticInsightsBundle\Service\InsightsHttpTokenResolver;
+use MauticPlugin\MauticInsightsBundle\Service\InsightsPublishedIntegrationFinder;
+use MauticPlugin\MauticInsightsBundle\Service\ResilientEventSender;
 use Psr\Log\LoggerInterface;
 use Throwable;
 

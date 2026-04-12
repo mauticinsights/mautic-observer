@@ -12,8 +12,8 @@ use Mautic\CampaignBundle\Event\ExecutedBatchEvent;
 use Mautic\CampaignBundle\Event\ExecutedEvent;
 use Mautic\CampaignBundle\Event\FailedEvent;
 use Mautic\CampaignBundle\Event\ScheduledEvent;
-use MauticPlugin\MauticInsightsBundle\Service\DeferredOutboundEventQueue;
-use MauticPlugin\MauticInsightsBundle\Service\MauticEventBuffer;
+use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
+use MauticPlugin\MauticInsightsBundle\Buffer\MauticEventBuffer;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**

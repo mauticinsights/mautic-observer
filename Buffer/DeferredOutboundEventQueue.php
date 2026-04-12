@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace MauticPlugin\MauticInsightsBundle\Service;
+namespace MauticPlugin\MauticInsightsBundle\Buffer;
 
 /**
  * FIFO queue for events that must not hit {@see MauticEventBuffer} until request shutdown flush.

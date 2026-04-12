@@ -8,11 +8,11 @@ use Generator;
 use Mautic\EmailBundle\EmailEvents;
 use Mautic\LeadBundle\LeadEvents;
 use Mautic\PluginBundle\Entity\Integration;
+use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
+use MauticPlugin\MauticInsightsBundle\Buffer\MauticEventBuffer;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
-use MauticPlugin\MauticInsightsBundle\Service\DeferredOutboundEventQueue;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsHttpTokenResolver;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPublishedIntegrationFinder;
-use MauticPlugin\MauticInsightsBundle\Service\MauticEventBuffer;
 use MauticPlugin\MauticInsightsBundle\Service\NoopInsightsApiSendGate;
 use MauticPlugin\MauticInsightsBundle\Service\ResilientEventSender;
 use MauticPlugin\MauticInsightsBundle\Tests\Stubs\SeededBacklogPersistentBuffer;
@@ -23,7 +23,7 @@ use Psr\Log\NullLogger;
 /**
  * Ensures deferred → {@see MauticEventBuffer} delivery is identical whether the
  * integration durable buffer is enabled ({@see \MauticPlugin\MauticInsightsBundle\Tests\Stubs\EnabledNopPersistentBuffer})
- * or disabled ({@see \MauticPlugin\MauticInsightsBundle\Service\DisabledPersistentEventBuffer}).
+ * or disabled ({@see \MauticPlugin\MauticInsightsBundle\Buffer\DisabledPersistentEventBuffer}).
  */
 final class EventBufferFlushPersistentModesFunctionalTest extends TestCase
 {

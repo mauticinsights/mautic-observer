@@ -10,10 +10,10 @@ use Mautic\PageBundle\Entity\Hit;
 use Mautic\PageBundle\Entity\Page;
 use Mautic\PageBundle\Event\PageHitEvent;
 use Mautic\PageBundle\PageEvents;
+use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
+use MauticPlugin\MauticInsightsBundle\Buffer\MauticEventBuffer;
 use MauticPlugin\MauticInsightsBundle\EventSubscriber\PageInsightsEventSubscriber;
-use MauticPlugin\MauticInsightsBundle\Service\DeferredOutboundEventQueue;
 use MauticPlugin\MauticInsightsBundle\Service\LeadInsightsContextBuilder;
-use MauticPlugin\MauticInsightsBundle\Service\MauticEventBuffer;
 use MauticPlugin\MauticInsightsBundle\Tests\Support\CapturingBufferTestSupport;
 use PHPUnit\Framework\TestCase;
 

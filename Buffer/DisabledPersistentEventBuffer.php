@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace MauticPlugin\MauticInsightsBundle\Service;
+namespace MauticPlugin\MauticInsightsBundle\Buffer;
 
 /**
  * No persistence — use for a separate {@see MauticEventBuffer} (e.g. segments) so it does not share the main queue.

@@ -23,7 +23,7 @@ parameters:
         # table_prefix is Mautic-specific; DBAL getParams() PHPDoc omits it so PHPStan thinks $prefix is always ''.
         -
             identifier: notIdentical.alwaysFalse
-            path: Service/DatabaseEventBuffer.php
+            path: Buffer/DatabaseEventBuffer.php
         # Untyped $message / $level match psr/log 1.x LoggerInterface (production Mautic may resolve older psr/log).
         -
             identifier: missingType.parameter

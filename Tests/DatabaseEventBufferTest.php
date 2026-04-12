@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace MauticPlugin\MauticInsightsBundle\Tests;
 
 use Doctrine\DBAL\DriverManager;
-use MauticPlugin\MauticInsightsBundle\Service\ChainPersistentEventBuffer;
-use MauticPlugin\MauticInsightsBundle\Service\DatabaseEventBuffer;
-use MauticPlugin\MauticInsightsBundle\Service\FileEventBuffer;
-use MauticPlugin\MauticInsightsBundle\Service\RedisEventBuffer;
+use MauticPlugin\MauticInsightsBundle\Buffer\ChainPersistentEventBuffer;
+use MauticPlugin\MauticInsightsBundle\Buffer\DatabaseEventBuffer;
+use MauticPlugin\MauticInsightsBundle\Buffer\FileEventBuffer;
+use MauticPlugin\MauticInsightsBundle\Buffer\RedisEventBuffer;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 

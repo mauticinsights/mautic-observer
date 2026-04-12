@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
-namespace MauticPlugin\MauticInsightsBundle\Service;
+namespace MauticPlugin\MauticInsightsBundle\Buffer;
 
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
+use MauticPlugin\MauticInsightsBundle\Service\InsightsPublishedIntegrationFinder;
 
 /**
  * Reads durable outbound buffer toggle from published integration feature settings.

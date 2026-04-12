@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace MauticPlugin\MauticInsightsBundle\Tests;
 
-use MauticPlugin\MauticInsightsBundle\Service\FileEventBuffer;
+use MauticPlugin\MauticInsightsBundle\Buffer\FileEventBuffer;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 

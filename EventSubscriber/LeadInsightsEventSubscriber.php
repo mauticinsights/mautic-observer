@@ -11,9 +11,9 @@ use Mautic\LeadBundle\Event\LeadEvent;
 use Mautic\LeadBundle\Event\ListChangeEvent;
 use Mautic\LeadBundle\Event\PointsChangeEvent;
 use Mautic\LeadBundle\LeadEvents;
-use MauticPlugin\MauticInsightsBundle\Service\DeferredOutboundEventQueue;
+use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
+use MauticPlugin\MauticInsightsBundle\Buffer\MauticEventBuffer;
 use MauticPlugin\MauticInsightsBundle\Service\LeadInsightsContextBuilder;
-use MauticPlugin\MauticInsightsBundle\Service\MauticEventBuffer;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**

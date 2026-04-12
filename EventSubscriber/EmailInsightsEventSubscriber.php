@@ -11,7 +11,7 @@ use Mautic\EmailBundle\Event\EmailSendEvent;
 use Mautic\EmailBundle\Event\QueueEmailEvent;
 use Mautic\EmailBundle\Event\TransportWebhookEvent;
 use Mautic\PointBundle\Event\TriggerExecutedEvent;
-use MauticPlugin\MauticInsightsBundle\Service\DeferredOutboundEventQueue;
+use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
 use MauticPlugin\MauticInsightsBundle\Service\EmailInsightsContextBuilder;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 

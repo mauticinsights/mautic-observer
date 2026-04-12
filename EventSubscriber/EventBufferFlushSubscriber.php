@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace MauticPlugin\MauticInsightsBundle\EventSubscriber;
 
+use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
+use MauticPlugin\MauticInsightsBundle\Buffer\MauticEventBuffer;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
-use MauticPlugin\MauticInsightsBundle\Service\DeferredOutboundEventQueue;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsApiSendGate;
-use MauticPlugin\MauticInsightsBundle\Service\MauticEventBuffer;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\HttpKernel\Event\TerminateEvent;
@@ -15,7 +15,7 @@ use Symfony\Component\HttpKernel\KernelEvents;
 
 /**
  * Drains {@see DeferredOutboundEventQueue} into the main {@see MauticEventBuffer} then flushes POST {@see InsightsApiConfig::EVENT_NOTIFY_URL}.
- * Works with any {@see \MauticPlugin\MauticInsightsBundle\Service\PersistentEventBufferInterface} configuration (durable buffer on or off).
+ * Works with any {@see \MauticPlugin\MauticInsightsBundle\Buffer\PersistentEventBufferInterface} configuration (durable buffer on or off).
  */
 final class EventBufferFlushSubscriber implements EventSubscriberInterface
 {

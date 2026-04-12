@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace MauticPlugin\MauticInsightsBundle\Tests\Stubs;
 
-use MauticPlugin\MauticInsightsBundle\Service\EventBufferLoadResult;
-use MauticPlugin\MauticInsightsBundle\Service\PersistentEventBufferInterface;
+use MauticPlugin\MauticInsightsBundle\Buffer\EventBufferLoadResult;
+use MauticPlugin\MauticInsightsBundle\Buffer\PersistentEventBufferInterface;
 
 /**
  * Always-enabled no-op persistent buffer for unit tests: reports isEnabled()=true so
- * {@see \MauticPlugin\MauticInsightsBundle\Service\MauticEventBuffer} accumulates events
+ * {@see \MauticPlugin\MauticInsightsBundle\Buffer\MauticEventBuffer} accumulates events
  * in memory and sends them in a single batch on flush() — matching test expectations.
  */
 final class EnabledNopPersistentBuffer implements PersistentEventBufferInterface

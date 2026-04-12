@@ -6,8 +6,8 @@ namespace MauticPlugin\MauticInsightsBundle\EventSubscriber;
 
 use Mautic\LeadBundle\Event\LeadListEvent;
 use Mautic\LeadBundle\LeadEvents;
+use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
-use MauticPlugin\MauticInsightsBundle\Service\DeferredOutboundEventQueue;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**

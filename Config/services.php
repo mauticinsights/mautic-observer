@@ -3,14 +3,16 @@
 declare(strict_types=1);
 
 use Mautic\CoreBundle\DependencyInjection\MauticCoreExtension;
+use MauticPlugin\MauticInsightsBundle\Buffer\ConfigurablePersistentEventBuffer;
+use MauticPlugin\MauticInsightsBundle\Buffer\DatabaseEventBuffer;
+use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
+use MauticPlugin\MauticInsightsBundle\Buffer\DisabledPersistentEventBuffer;
+use MauticPlugin\MauticInsightsBundle\Buffer\FileEventBuffer;
+use MauticPlugin\MauticInsightsBundle\Buffer\MauticEventBuffer;
+use MauticPlugin\MauticInsightsBundle\Buffer\RedisEventBuffer;
 use MauticPlugin\MauticInsightsBundle\EventSubscriber\EventBufferFlushSubscriber;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
 use MauticPlugin\MauticInsightsBundle\Integration\MauticInsightsIntegration;
-use MauticPlugin\MauticInsightsBundle\Service\ConfigurablePersistentEventBuffer;
-use MauticPlugin\MauticInsightsBundle\Service\DatabaseEventBuffer;
-use MauticPlugin\MauticInsightsBundle\Service\DeferredOutboundEventQueue;
-use MauticPlugin\MauticInsightsBundle\Service\DisabledPersistentEventBuffer;
-use MauticPlugin\MauticInsightsBundle\Service\FileEventBuffer;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsApiOutageCoordinator;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsApiSendGate;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsHttpTokenResolver;
@@ -18,8 +20,6 @@ use MauticPlugin\MauticInsightsBundle\Service\InsightsLastApiTelemetry;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPluginLogger;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPluginLoggingFeatureReader;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPublishedIntegrationFinder;
-use MauticPlugin\MauticInsightsBundle\Service\MauticEventBuffer;
-use MauticPlugin\MauticInsightsBundle\Service\RedisEventBuffer;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
@@ -42,7 +42,7 @@ return function (ContainerConfigurator $configurator): void {
         MauticCoreExtension::DEFAULT_EXCLUDES,
         [
             // Value object; Symfony cannot autowire array $events in __construct().
-            'Service/EventBufferLoadResult.php',
+            'Buffer/EventBufferLoadResult.php',
             // Wired explicitly with inner logger + feature reader (avoid circular bind on $logger).
             'Service/InsightsPluginLogger.php',
             // $dataDir must be explicit; prototype load would overwrite an earlier ->set().

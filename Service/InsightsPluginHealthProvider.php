@@ -15,6 +15,8 @@ use Mautic\CoreBundle\Helper\UserHelper;
 use Mautic\EmailBundle\Entity\Email;
 use Mautic\LeadBundle\Entity\Lead;
 use Mautic\LeadBundle\Entity\LeadList;
+use MauticPlugin\MauticInsightsBundle\Buffer\ChainPersistentEventBuffer;
+use MauticPlugin\MauticInsightsBundle\Buffer\PersistentBufferFeatureReader;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
 use MauticPlugin\MauticInsightsBundle\InsightsPluginVersion;
 use Symfony\Contracts\Translation\LocaleAwareInterface;
