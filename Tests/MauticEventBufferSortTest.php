@@ -45,6 +45,43 @@ final class MauticEventBufferSortTest extends TestCase
         $this->assertSame(3, $rows[2]['n'] ?? null);
     }
 
+    public function testPushOrderPreservedWhenWallClockSecondIsIdentical(): void
+    {
+        $client = $this->createCapturingClient();
+        $buffer = $this->createBuffer($client);
+
+        $sameSecond = '2026-06-01T12:00:00+00:00';
+        $buffer->push('third', ['ts' => $sameSecond, 'n' => 3]);
+        $buffer->push('first', ['ts' => $sameSecond, 'n' => 1]);
+        $buffer->push('second', ['ts' => $sameSecond, 'n' => 2]);
+        $buffer->flush();
+
+        $decoded = json_decode($this->capturedRequests[0]['options']['body'] ?? '', true, 512, JSON_THROW_ON_ERROR);
+        $rows = $decoded['events'] ?? [];
+        $this->assertCount(3, $rows);
+        $this->assertSame(3, $rows[0]['n'] ?? null);
+        $this->assertSame(1, $rows[1]['n'] ?? null);
+        $this->assertSame(2, $rows[2]['n'] ?? null);
+    }
+
+    public function testAutoTsUsesFractionalSecondsSoRapidPushesStayOrdered(): void
+    {
+        $client = $this->createCapturingClient();
+        $buffer = $this->createBuffer($client);
+
+        $buffer->push('a', ['n' => 1]);
+        $buffer->push('b', ['n' => 2]);
+        $buffer->push('c', ['n' => 3]);
+        $buffer->flush();
+
+        $decoded = json_decode($this->capturedRequests[0]['options']['body'] ?? '', true, 512, JSON_THROW_ON_ERROR);
+        $rows = $decoded['events'] ?? [];
+        $this->assertCount(3, $rows);
+        $this->assertSame(1, $rows[0]['n'] ?? null);
+        $this->assertSame(2, $rows[1]['n'] ?? null);
+        $this->assertSame(3, $rows[2]['n'] ?? null);
+    }
+
     public function testEventsWithoutParseableTsAreSentLastPreservingPushOrder(): void
     {
         $client = $this->createCapturingClient();

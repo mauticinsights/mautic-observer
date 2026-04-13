@@ -22,7 +22,9 @@ use Throwable;
  * All events accumulate in memory; {@see flush()} (called by {@see \MauticPlugin\MauticInsightsBundle\EventSubscriber\EventBufferFlushSubscriber} on kernel response/terminate) sends them in one batch.
  * When {@see PersistentEventBufferInterface::isEnabled()} is true, the persistent buffer is used for durability; when false, events are held in memory until flush and dropped on failure.
  *
- * Before HTTP send, events are sorted by payload {@code ts} (ISO-8601), oldest first; rows without a parseable {@code ts} go last, preserving their relative order.
+ * Before HTTP send, events are sorted by payload {@code ts} (ISO-8601, including fractional seconds), oldest first;
+ * rows without a parseable {@code ts} go last, preserving their relative order. Auto-generated {@code ts} uses
+ * microsecond resolution so same-request pushes keep enqueue order when wall-clock second is identical.
  *
  * {@see InsightsApiSendGate} applies exponential backoff across flushes and (after 24h outage) can unpublish the integration.
  */
@@ -174,7 +176,7 @@ final class MauticEventBuffer
 
     private function formatTimestamp(): string
     {
-        return (new DateTimeImmutable('now', new DateTimeZone('UTC')))->format(\DATE_ATOM);
+        return (new DateTimeImmutable('now', new DateTimeZone('UTC')))->format('Y-m-d\TH:i:s.u\Z');
     }
 
     /**
@@ -215,21 +217,23 @@ final class MauticEventBuffer
     }
 
     /**
-     * Unix timestamp for sorting; {@see \PHP_INT_MAX} means missing/invalid {@code ts} (sorted last).
+     * Sort key: Unix time as float (seconds + fractional part from {@code ts}). {@see INF} = missing/invalid {@code ts} (last).
      *
      * @param array<string, mixed> $event
      */
-    private function eventTimestampSortKey(array $event): int
+    private function eventTimestampSortKey(array $event): float
     {
         $ts = $event['ts'] ?? null;
         if (!\is_string($ts) || '' === trim($ts)) {
-            return \PHP_INT_MAX;
+            return \INF;
         }
 
         try {
-            return (new DateTimeImmutable($ts))->getTimestamp();
+            $dt = new DateTimeImmutable($ts);
+
+            return (float) $dt->format('U.u');
         } catch (Throwable) {
-            return \PHP_INT_MAX;
+            return \INF;
         }
     }
 }
