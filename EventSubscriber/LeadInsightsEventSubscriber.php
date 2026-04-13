@@ -48,10 +48,17 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
         }
 
         // All non-anonymous saves (not only isNew): Mautic often updates the same request after first persist; isNew-only missed real creates.
-        $this->deferredLeadOutboundQueue->enqueue(
-            LeadEvents::LEAD_POST_SAVE,
-            $this->contextBuilder->buildPayloadFromLead($lead)
-        );
+        $payload = $this->contextBuilder->buildPayloadFromLead($lead);
+
+        // Mark new contacts so the API side can distinguish creates from updates for contact counting.
+        if ($event->isNew()) {
+            $existing = $payload['properties'] ?? [];
+            $payload['properties'] = \is_array($existing)
+                ? array_merge($existing, ['is_new' => true])
+                : ['is_new' => true];
+        }
+
+        $this->deferredLeadOutboundQueue->enqueue(LeadEvents::LEAD_POST_SAVE, $payload);
     }
 
     public function onLeadDelete(LeadEvent $event): void

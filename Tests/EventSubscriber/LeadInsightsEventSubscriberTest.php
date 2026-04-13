@@ -113,11 +113,11 @@ final class LeadInsightsEventSubscriberTest extends TestCase
     // LEAD_POST_SAVE  →  contact.create
     // ──────────────────────────────────────────────────────────────
 
-    public function testContactSaveRequestBody(): void
+    public function testContactSaveRequestBodyForNewContact(): void
     {
         [$buffer, $queue, $subscriber] = $this->makeStack([['id' => 5], ['id' => 9]]);
 
-        $subscriber->onLeadSave(new LeadEvent($this->makeFullLead(), true));
+        $subscriber->onLeadSave(new LeadEvent($this->makeFullLead(), isNew: true));
         $queue->flushTo($buffer);
 
         $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
@@ -134,9 +134,24 @@ final class LeadInsightsEventSubscriberTest extends TestCase
                     'first_name' => 'Jan',
                     'last_name' => 'Novák',
                     'tags' => ['vip', 'newsletter'],
+                    'is_new' => true,
                 ],
             ],
         ], $rows);
+    }
+
+    public function testContactSaveRequestBodyForUpdateDoesNotIncludeIsNew(): void
+    {
+        [$buffer, $queue, $subscriber] = $this->makeStack([['id' => 5], ['id' => 9]]);
+
+        $subscriber->onLeadSave(new LeadEvent($this->makeFullLead(), isNew: false));
+        $queue->flushTo($buffer);
+
+        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame(LeadEvents::LEAD_POST_SAVE, $rows[0]['event']);
+        $this->assertArrayNotHasKey('is_new', $rows[0]['properties'] ?? []);
     }
 
     public function testContactSaveIsQueuedViaDeferred(): void
