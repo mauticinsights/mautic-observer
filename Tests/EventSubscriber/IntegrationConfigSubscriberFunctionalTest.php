@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace MauticPlugin\MauticInsightsBundle\Tests\EventSubscriber;
 
-use Doctrine\ORM\AbstractQuery;
-use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\QueryBuilder;
 use Mautic\ConfigBundle\ConfigEvents;
 use Mautic\ConfigBundle\Event\ConfigEvent;
 use Mautic\CoreBundle\Helper\AppVersion;
@@ -23,6 +20,7 @@ use MauticPlugin\MauticInsightsBundle\InsightsPluginVersion;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsHttpTokenResolver;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsLastApiTelemetry;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPublishedIntegrationFinder;
+use MauticPlugin\MauticInsightsBundle\Service\MauticLeadCountsForInsightsStatus;
 use MauticPlugin\MauticInsightsBundle\Service\NoopInsightsApiSendGate;
 use MauticPlugin\MauticInsightsBundle\Service\StatusNotifyPayload;
 use PHPUnit\Framework\TestCase;
@@ -62,7 +60,7 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
         $captured = [];
         $subscriber = $this->makeSubscriber(
             version: '5.2.0',
-            contactCount: 10,
+            identifiedContacts: 10,
             senderEmail: 'from@example.com',
             token: 'cli-token',
             captured: $captured,
@@ -87,7 +85,7 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
         $captured = [];
         $subscriber = $this->makeSubscriber(
             version: '5.2.0',
-            contactCount: 0,
+            identifiedContacts: 0,
             senderEmail: 'x@x.com',
             token: 'tok',
             captured: $captured,
@@ -112,7 +110,7 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
         $captured = [];
         $subscriber = $this->makeSubscriber(
             version: '5.0.0',
-            contactCount: 0,
+            identifiedContacts: 0,
             senderEmail: 'a@b.com',
             token: 't',
             captured: $captured,
@@ -146,10 +144,11 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
         $captured = [];
         $subscriber = $this->makeSubscriber(
             version: '5.2.0',
-            contactCount: 42,
+            identifiedContacts: 42,
             senderEmail: 'from@example.com',
             token: 'my-token',
             captured: $captured,
+            anonymousContacts: 9,
         );
 
         $trigger($subscriber);
@@ -164,7 +163,7 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
 
         $body = json_decode($captured[0]['options']['body'] ?? '', true, 512, JSON_THROW_ON_ERROR);
         $this->assertSame(
-            StatusNotifyPayload::build('5.2.0', InsightsPluginVersion::get(), 42, 'from@example.com'),
+            StatusNotifyPayload::build('5.2.0', InsightsPluginVersion::get(), 42, 9, 'from@example.com'),
             $body,
             $triggerDescription
         );
@@ -204,7 +203,7 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
         $captured = [];
         $subscriber = $this->makeSubscriber(
             version: '5.0.0',
-            contactCount: 0,
+            identifiedContacts: 0,
             senderEmail: 'fallback@example.com',
             token: 'tok',
             captured: $captured,
@@ -224,7 +223,7 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
         $captured = [];
         $subscriber = $this->makeSubscriber(
             version: '5.0.0',
-            contactCount: 0,
+            identifiedContacts: 0,
             senderEmail: 'core-param@example.com',
             token: 'tok',
             captured: $captured,
@@ -255,7 +254,7 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
         $subscriber = $this->makeSubscriberWithIntegration(
             integration: $integration,
             version: '5.1.0',
-            contactCount: 0,
+            identifiedContacts: 0,
             senderEmail: 'x@x.com',
             captured: $captured,
             encryptionHelper: new class extends EncryptionHelper {
@@ -285,7 +284,7 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
         $subscriber = $this->makeSubscriberWithIntegration(
             integration: $integration,
             version: '5.0.0',
-            contactCount: 0,
+            identifiedContacts: 0,
             senderEmail: 'x@x.com',
             captured: $captured,
         );
@@ -305,7 +304,7 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
         $subscriber = $this->makeSubscriberWithIntegration(
             integration: $integration,
             version: '5.0.0',
-            contactCount: 0,
+            identifiedContacts: 0,
             senderEmail: 'x@x.com',
             captured: $captured,
         );
@@ -325,7 +324,7 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
         $subscriber = $this->makeSubscriberWithIntegration(
             integration: $integration,
             version: '5.0.0',
-            contactCount: 0,
+            identifiedContacts: 0,
             senderEmail: 'x@x.com',
             captured: $captured,
         );
@@ -349,7 +348,7 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
         $subscriber = $this->makeSubscriberWithIntegration(
             integration: $integration,
             version: '5.0.0',
-            contactCount: 0,
+            identifiedContacts: 0,
             senderEmail: 'x@x.com',
             captured: $captured,
         );
@@ -371,16 +370,17 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
     // ──────────────────────────────────────────────────────────────
 
     /**
-     * Shortcut: builds a subscriber with a fixed integration (token resolved from it), version, contact count, sender.
+     * Shortcut: builds a subscriber with a fixed integration (token resolved from it), version, contact counts, sender.
      *
      * @param array<string, mixed>[] &$captured
      */
     private function makeSubscriber(
         string $version,
-        int $contactCount,
+        int $identifiedContacts,
         string $senderEmail,
         string $token,
         array &$captured,
+        int $anonymousContacts = 0,
     ): IntegrationConfigSubscriber {
         $integration = new Integration(true, [], InsightsApiConfig::NAME, [
             InsightsApiConfig::HTTP_TOKEN_FIELD => $token,
@@ -389,7 +389,8 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
         return $this->makeSubscriberWithIntegration(
             integration: $integration,
             version: $version,
-            contactCount: $contactCount,
+            identifiedContacts: $identifiedContacts,
+            anonymousContacts: $anonymousContacts,
             senderEmail: $senderEmail,
             captured: $captured,
         );
@@ -401,9 +402,10 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
     private function makeSubscriberWithIntegration(
         Integration $integration,
         string $version,
-        int $contactCount,
+        int $identifiedContacts,
         string $senderEmail,
         array &$captured,
+        int $anonymousContacts = 0,
         ?EncryptionHelper $encryptionHelper = null,
     ): IntegrationConfigSubscriber {
         $httpClient = new MockHttpClient(
@@ -414,25 +416,9 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
             }
         );
 
-        $query = $this->createMock(AbstractQuery::class);
-        $query->method('getSingleScalarResult')->willReturn($contactCount);
-
-        $expr = new class {
-            public function isNotNull(string $field): string
-            {
-                return $field.' IS NOT NULL';
-            }
-        };
-
-        $qb = $this->createMock(QueryBuilder::class);
-        $qb->method('select')->willReturnSelf();
-        $qb->method('from')->willReturnSelf();
-        $qb->method('where')->willReturnSelf();
-        $qb->method('expr')->willReturn($expr);
-        $qb->method('getQuery')->willReturn($query);
-
-        $em = $this->createMock(EntityManagerInterface::class);
-        $em->method('createQueryBuilder')->willReturn($qb);
+        $leadCounts = $this->createMock(MauticLeadCountsForInsightsStatus::class);
+        $leadCounts->method('countIdentified')->willReturn($identifiedContacts);
+        $leadCounts->method('countAnonymous')->willReturn($anonymousContacts);
 
         $coreParams = new CoreParametersHelper();
         $coreParams->params = ['mailer_from_email' => $senderEmail];
@@ -441,7 +427,7 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
             $httpClient,
             new AppVersion($version),
             $coreParams,
-            $em,
+            $leadCounts,
             InsightsPublishedIntegrationFinder::createForTest($integration),
             new InsightsHttpTokenResolver($encryptionHelper),
             new NullLogger(),

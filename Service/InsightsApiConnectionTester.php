@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace MauticPlugin\MauticInsightsBundle\Service;
 
-use Doctrine\ORM\EntityManagerInterface;
 use Mautic\CoreBundle\Helper\AppVersion;
 use Mautic\CoreBundle\Helper\CoreParametersHelper;
-use Mautic\LeadBundle\Entity\Lead;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
 use MauticPlugin\MauticInsightsBundle\InsightsPluginVersion;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -24,7 +22,7 @@ final class InsightsApiConnectionTester
         private HttpClientInterface $httpClient,
         private InsightsLastApiTelemetry $lastApiTelemetry,
         private AppVersion $appVersion,
-        private EntityManagerInterface $entityManager,
+        private MauticLeadCountsForInsightsStatus $leadCountsForStatus,
         private CoreParametersHelper $coreParametersHelper,
     ) {
     }
@@ -54,7 +52,8 @@ final class InsightsApiConnectionTester
                 'json' => StatusNotifyPayload::build(
                     (string) $this->appVersion->getVersion(),
                     InsightsPluginVersion::get(),
-                    $this->countIdentifiedContacts(),
+                    $this->leadCountsForStatus->countIdentified(),
+                    $this->leadCountsForStatus->countAnonymous(),
                     (string) $this->coreParametersHelper->get('mailer_from_email'),
                 ),
                 'timeout' => 15,
@@ -75,20 +74,6 @@ final class InsightsApiConnectionTester
             $this->lastApiTelemetry->record(InsightsApiConfig::STATUS_NOTIFY_URL, 'POST', 0, false, $e->getMessage());
 
             return ['ok' => false, 'http_status' => 0, 'error' => $e->getMessage()];
-        }
-    }
-
-    private function countIdentifiedContacts(): int
-    {
-        try {
-            $qb = $this->entityManager->createQueryBuilder();
-            $qb->select('COUNT(l.id)')
-                ->from(Lead::class, 'l')
-                ->where($qb->expr()->isNotNull('l.dateIdentified'));
-
-            return (int) $qb->getQuery()->getSingleScalarResult();
-        } catch (Throwable) {
-            return 0;
         }
     }
 }

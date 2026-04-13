@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace MauticPlugin\MauticInsightsBundle\EventSubscriber;
 
-use Doctrine\ORM\EntityManagerInterface;
 use Mautic\ConfigBundle\ConfigEvents;
 use Mautic\ConfigBundle\Event\ConfigEvent;
 use Mautic\CoreBundle\Helper\AppVersion;
 use Mautic\CoreBundle\Helper\CoreParametersHelper;
 use Mautic\IntegrationsBundle\Event\ConfigSaveEvent;
 use Mautic\IntegrationsBundle\IntegrationEvents;
-use Mautic\LeadBundle\Entity\Lead;
 use Mautic\PluginBundle\Entity\Integration;
 use Mautic\PluginBundle\Event\PluginInstallEvent;
 use Mautic\PluginBundle\Event\PluginIntegrationEvent;
@@ -23,6 +21,7 @@ use MauticPlugin\MauticInsightsBundle\Service\InsightsApiSendGate;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsHttpTokenResolver;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsLastApiTelemetry;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPublishedIntegrationFinder;
+use MauticPlugin\MauticInsightsBundle\Service\MauticLeadCountsForInsightsStatus;
 use MauticPlugin\MauticInsightsBundle\Service\NoopInsightsApiSendGate;
 use MauticPlugin\MauticInsightsBundle\Service\StatusNotifyPayload;
 use Psr\Log\LoggerInterface;
@@ -62,7 +61,7 @@ class IntegrationConfigSubscriber implements EventSubscriberInterface
         private HttpClientInterface $httpClient,
         private AppVersion $appVersion,
         private CoreParametersHelper $coreParametersHelper,
-        private EntityManagerInterface $entityManager,
+        private MauticLeadCountsForInsightsStatus $leadCountsForStatus,
         private InsightsPublishedIntegrationFinder $integrationFinder,
         private InsightsHttpTokenResolver $httpTokenResolver,
         private LoggerInterface $logger,
@@ -173,7 +172,8 @@ class IntegrationConfigSubscriber implements EventSubscriberInterface
         $this->pendingStatusNotify = null;
 
         try {
-            $contactCount = $this->countIdentifiedContacts();
+            $identified = $this->leadCountsForStatus->countIdentified();
+            $anonymous = $this->leadCountsForStatus->countAnonymous();
             $senderEmail = (string) ($pending['senderEmail'] ?? $this->coreParametersHelper->get('mailer_from_email'));
 
             $response = $this->httpClient->request('POST', InsightsApiConfig::STATUS_NOTIFY_URL, [
@@ -185,7 +185,8 @@ class IntegrationConfigSubscriber implements EventSubscriberInterface
                 'json' => StatusNotifyPayload::build(
                     $pending['version'],
                     InsightsPluginVersion::get(),
-                    $contactCount,
+                    $identified,
+                    $anonymous,
                     $senderEmail
                 ),
                 'timeout' => 15,
@@ -262,29 +263,5 @@ class IntegrationConfigSubscriber implements EventSubscriberInterface
         }
 
         $this->queueStatusNotifyForIntegration($integration, null);
-    }
-
-    /**
-     * Same as Mautic contact list "non-anonymous" (identified): lead has date_identified set.
-     *
-     * @see \Mautic\LeadBundle\Entity\LeadRepository::addSearchCommandWhereClause() is:anonymous → date_identified IS NULL
-     */
-    private function countIdentifiedContacts(): int
-    {
-        try {
-            $qb = $this->entityManager->createQueryBuilder();
-            $qb->select('COUNT(l.id)')
-                ->from(Lead::class, 'l')
-                ->where($qb->expr()->isNotNull('l.dateIdentified'));
-
-            return (int) $qb->getQuery()->getSingleScalarResult();
-        } catch (Throwable $e) {
-            $this->logger->warning(
-                'Mautic Insights: could not count identified contacts: '.$e->getMessage(),
-                ['exception' => $e]
-            );
-
-            return 0;
-        }
     }
 }
