@@ -68,6 +68,17 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         return $lead;
     }
 
+    /** Lead state after {@see \Mautic\CoreBundle\Model\FormModel::deleteEntity}: {@code deletedId} set, OR id cleared. */
+    private function makeFullLeadPostDeleted(): Lead
+    {
+        $lead = $this->makeFullLead();
+        $id = $lead->getId();
+        $lead->stubId = null;
+        $lead->deletedId = $id;
+
+        return $lead;
+    }
+
     /**
      * Creates buffer + queue + subscriber wired together.
      * Returns [$buffer, $queue, $subscriber].
@@ -99,9 +110,8 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         $this->assertArrayHasKey(LeadEvents::LEAD_POST_SAVE, $map);
         $this->assertSame('onLeadSave', $map[LeadEvents::LEAD_POST_SAVE][0]);
 
-        $this->assertArrayHasKey(LeadEvents::LEAD_PRE_DELETE, $map);
-        $this->assertSame(['onLeadDelete', 0], $map[LeadEvents::LEAD_PRE_DELETE]);
-        $this->assertArrayNotHasKey(LeadEvents::LEAD_POST_DELETE, $map);
+        $this->assertArrayHasKey(LeadEvents::LEAD_POST_DELETE, $map);
+        $this->assertSame(['onLeadDelete', 0], $map[LeadEvents::LEAD_POST_DELETE]);
 
         $this->assertArrayHasKey(LeadEvents::LEAD_POINTS_CHANGE, $map);
         $this->assertArrayHasKey(LeadEvents::LEAD_LIST_CHANGE, $map);
@@ -191,21 +201,21 @@ final class LeadInsightsEventSubscriberTest extends TestCase
     }
 
     // ──────────────────────────────────────────────────────────────
-    // LEAD_PRE_DELETE  →  contact.delete
+    // LEAD_POST_DELETE  →  contact.delete (after DB delete)
     // ──────────────────────────────────────────────────────────────
 
     public function testContactDeleteRequestBody(): void
     {
         [$buffer, $queue, $subscriber] = $this->makeStack([['id' => 5], ['id' => 9]]);
 
-        $subscriber->onLeadDelete(new LeadEvent($this->makeFullLead(), false));
+        $subscriber->onLeadDelete(new LeadEvent($this->makeFullLeadPostDeleted(), false));
         $queue->flushTo($buffer);
 
         $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
 
         $this->assertSame([
             [
-                'event' => LeadEvents::LEAD_PRE_DELETE,
+                'event' => LeadEvents::LEAD_POST_DELETE,
                 'channel' => 'contact',
                 'contact_id' => 42,
                 'segment_ids' => [5, 9],
@@ -220,28 +230,29 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         ], $rows);
     }
 
-    public function testDeleteContactIdCapturedAtPreDeleteTime(): void
+    public function testDeleteContactIdUsesFormEntityDeletedId(): void
     {
         [$buffer, $queue, $subscriber] = $this->makeStack();
 
         $lead = new Lead();
-        $lead->stubId = 99;
+        $lead->stubId = null;
+        $lead->deletedId = 99;
         $lead->stubEmail = 'deleted@example.com';
 
         $subscriber->onLeadDelete(new LeadEvent($lead, false));
         $queue->flushTo($buffer);
 
         $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
-        $this->assertSame(99, $rows[0]['contact_id'], 'contact_id must be the ID captured at PRE_DELETE time');
-        $this->assertSame(LeadEvents::LEAD_PRE_DELETE, $rows[0]['event']);
+        $this->assertSame(99, $rows[0]['contact_id'], 'contact_id must match FormEntity::$deletedId (audit log objectId)');
+        $this->assertSame(LeadEvents::LEAD_POST_DELETE, $rows[0]['event']);
     }
 
-    public function testDeleteContactIdFallsBackToDeletedIdProperty(): void
+    public function testDeleteContactIdFallsBackToGetDeletedIdWhenPropertyUnset(): void
     {
         [$buffer, $queue, $subscriber] = $this->makeStack();
 
         $lead = new Lead();
-        $lead->stubId = 0;
+        $lead->stubId = null;
         $lead->stubDeletedId = 88;
         $lead->stubEmail = 'gone@example.com';
 
@@ -250,7 +261,7 @@ final class LeadInsightsEventSubscriberTest extends TestCase
 
         $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
         $this->assertSame(88, $rows[0]['contact_id']);
-        $this->assertSame(LeadEvents::LEAD_PRE_DELETE, $rows[0]['event']);
+        $this->assertSame(LeadEvents::LEAD_POST_DELETE, $rows[0]['event']);
     }
 
     public function testAnonymousDeleteIsIgnored(): void
@@ -501,6 +512,8 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         // create leadA, create leadB, delete leadA — all in the same lifecycle
         $subscriber->onLeadSave(new LeadEvent($leadA, true));
         $subscriber->onLeadSave(new LeadEvent($leadB, true));
+        $leadA->stubId = null;
+        $leadA->deletedId = 1;
         $subscriber->onLeadDelete(new LeadEvent($leadA, false));
         $queue->flushTo($buffer);
 
@@ -515,7 +528,7 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         $this->assertSame(2, $rows[1]['contact_id']);
         $this->assertSame('bob@example.com', $rows[1]['properties']['email']);
 
-        $this->assertSame(LeadEvents::LEAD_PRE_DELETE, $rows[2]['event']);
+        $this->assertSame(LeadEvents::LEAD_POST_DELETE, $rows[2]['event']);
         $this->assertSame(1, $rows[2]['contact_id']);
         $this->assertSame('alice@example.com', $rows[2]['properties']['email']);
     }
@@ -559,6 +572,8 @@ final class LeadInsightsEventSubscriberTest extends TestCase
 
         $subscriber->onLeadSave(new LeadEvent($leadA, true));
         $subscriber->onLeadSave(new LeadEvent($leadB, true));
+        $leadC->stubId = null;
+        $leadC->deletedId = 12;
         $subscriber->onLeadDelete(new LeadEvent($leadC, false));
 
         $kernel = $this->createMock(HttpKernelInterface::class);
@@ -577,7 +592,7 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         $this->assertSame(10, $events[0]['contact_id']);
         $this->assertSame(LeadEvents::LEAD_POST_SAVE, $events[1]['event']);
         $this->assertSame(11, $events[1]['contact_id']);
-        $this->assertSame(LeadEvents::LEAD_PRE_DELETE, $events[2]['event']);
+        $this->assertSame(LeadEvents::LEAD_POST_DELETE, $events[2]['event']);
         $this->assertSame(12, $events[2]['contact_id']);
     }
 
@@ -594,7 +609,8 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         $newLead->stubEmail = 'n@example.com';
 
         $delLead = new Lead();
-        $delLead->stubId = 6;
+        $delLead->stubId = null;
+        $delLead->deletedId = 6;
         $delLead->stubEmail = 'd@example.com';
 
         $subscriber->onLeadDelete(new LeadEvent($delLead, false));
@@ -602,7 +618,7 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         $queue->flushTo($buffer);
 
         $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
-        $this->assertSame(LeadEvents::LEAD_PRE_DELETE, $rows[0]['event'], 'Delete enqueued first must arrive first');
+        $this->assertSame(LeadEvents::LEAD_POST_DELETE, $rows[0]['event'], 'Delete enqueued first must arrive first');
         $this->assertSame(LeadEvents::LEAD_POST_SAVE, $rows[1]['event']);
     }
 

@@ -8,8 +8,6 @@ final class LeadEvents
 {
     public const LEAD_POST_SAVE = 'mautic.lead_post_save';
 
-    public const LEAD_PRE_DELETE = 'mautic.lead_pre_delete';
-
     public const LEAD_POST_DELETE = 'mautic.lead_post_delete';
 
     public const LEAD_POINTS_CHANGE = 'mautic.lead_points_change';

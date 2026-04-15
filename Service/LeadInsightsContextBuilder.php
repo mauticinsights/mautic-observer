@@ -56,21 +56,23 @@ final class LeadInsightsContextBuilder
     }
 
     /**
-     * Prefer {@see Lead::getId()}; after delete Mautic may clear id — use {@code getDeletedId()} when present.
+     * After DB delete, {@see \Mautic\CoreBundle\Model\FormModel::deleteEntity} sets {@see \Mautic\CoreBundle\Entity\FormEntity::$deletedId}
+     * to the former primary key (same value as audit log {@code objectId} in {@see \Mautic\LeadBundle\EventListener\LeadSubscriber::onLeadDelete});
+     * {@see Lead::getId()} may then be null. Prefer {@code deletedId} so {@see buildLeadAugmentation} still emits {@code contact_id}.
      */
     public function resolvePositiveContactId(Lead $lead): ?int
     {
-        $candidates = [$lead->getId()];
-        if (method_exists($lead, 'getDeletedId')) {
-            $candidates[] = $lead->getDeletedId();
-        }
-        // {@see \Mautic\CoreBundle\Entity\FormEntity::$deletedId} is populated after DB delete; on LEAD_PRE_DELETE prefer {@see Lead::getId()}.
+        $candidates = [];
         if (property_exists($lead, 'deletedId')) {
             $vars = \get_object_vars($lead);
             if (\array_key_exists('deletedId', $vars)) {
                 $candidates[] = $vars['deletedId'];
             }
         }
+        if (method_exists($lead, 'getDeletedId')) {
+            $candidates[] = $lead->getDeletedId();
+        }
+        $candidates[] = $lead->getId();
 
         foreach ($candidates as $raw) {
             if (null === $raw) {

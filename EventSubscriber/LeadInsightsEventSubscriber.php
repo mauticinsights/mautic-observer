@@ -32,7 +32,7 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
     {
         return [
             LeadEvents::LEAD_POST_SAVE => ['onLeadSave', 0],
-            LeadEvents::LEAD_PRE_DELETE => ['onLeadDelete', 0],
+            LeadEvents::LEAD_POST_DELETE => ['onLeadDelete', 0],
             LeadEvents::LEAD_POINTS_CHANGE => ['onPointsChange', 0],
             LeadEvents::LEAD_LIST_CHANGE => ['onListChange', 0],
             LeadEvents::LEAD_IDENTIFIED => ['onLeadIdentified', 0],
@@ -69,7 +69,7 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
         }
 
         $this->deferredLeadOutboundQueue->enqueue(
-            LeadEvents::LEAD_PRE_DELETE,
+            LeadEvents::LEAD_POST_DELETE,
             $this->contextBuilder->buildPayloadFromLead($lead)
         );
     }
