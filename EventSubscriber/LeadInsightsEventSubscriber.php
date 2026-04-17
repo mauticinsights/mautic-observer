@@ -31,7 +31,11 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
     public static function getSubscribedEvents(): array
     {
         return [
-            LeadEvents::LEAD_POST_SAVE => ['onLeadSave', 0],
+            // High priority: core {@see \Mautic\LeadBundle\EventListener\LeadSubscriber::onLeadPostSave()} re-dispatches
+            // {@see LeadEvents::LEAD_IDENTIFIED} synchronously inside its own LEAD_POST_SAVE handler, which would cause
+            // our LEAD_IDENTIFIED row to get a ts a few ms earlier than our LEAD_POST_SAVE row. Running first keeps
+            // LEAD_POST_SAVE's ts strictly before the nested LEAD_IDENTIFIED ts, matching Mautic's actual top-level dispatch order.
+            LeadEvents::LEAD_POST_SAVE => ['onLeadSave', 255],
             LeadEvents::LEAD_POST_DELETE => ['onLeadDelete', 0],
             LeadEvents::LEAD_POINTS_CHANGE => ['onPointsChange', 0],
             LeadEvents::LEAD_LIST_CHANGE => ['onListChange', 0],
