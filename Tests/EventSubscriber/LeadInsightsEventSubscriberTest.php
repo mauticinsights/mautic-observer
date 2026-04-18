@@ -13,7 +13,6 @@ use Mautic\LeadBundle\Entity\LeadList;
 use Mautic\LeadBundle\Entity\Tag;
 use Mautic\LeadBundle\Event\LeadEvent;
 use Mautic\LeadBundle\Event\ListChangeEvent;
-use Mautic\LeadBundle\Event\PointsChangeEvent;
 use Mautic\LeadBundle\LeadEvents;
 use Mautic\LeadBundle\Model\LeadModel;
 use Mautic\PluginBundle\Entity\Integration;
@@ -64,6 +63,7 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         $lead->stubFirstname = 'Jan';
         $lead->stubLastname = 'Novák';
         $lead->stubTags = [new Tag('vip'), new Tag('newsletter')];
+        $lead->stubPoints = 42;
 
         return $lead;
     }
@@ -113,10 +113,13 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         $this->assertArrayHasKey(LeadEvents::LEAD_POST_DELETE, $map);
         $this->assertSame(['onLeadDelete', 0], $map[LeadEvents::LEAD_POST_DELETE]);
 
-        $this->assertArrayHasKey(LeadEvents::LEAD_POINTS_CHANGE, $map);
         $this->assertArrayHasKey(LeadEvents::LEAD_LIST_CHANGE, $map);
         $this->assertArrayHasKey(LeadEvents::LEAD_IDENTIFIED, $map);
         $this->assertArrayHasKey(FormEvents::FORM_ON_SUBMIT, $map);
+
+        // LEAD_POINTS_CHANGE is intentionally NOT subscribed – not part of MVP (no scoring
+        // metrics in funnel/realtime dashboards). See LeadInsightsEventSubscriber::getSubscribedEvents().
+        $this->assertArrayNotHasKey(LeadEvents::LEAD_POINTS_CHANGE, $map);
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -144,6 +147,7 @@ final class LeadInsightsEventSubscriberTest extends TestCase
                     'first_name' => 'Jan',
                     'last_name' => 'Novák',
                     'tags' => ['vip', 'newsletter'],
+                    'points' => 42,
                     'is_new' => true,
                 ],
             ],
@@ -225,6 +229,7 @@ final class LeadInsightsEventSubscriberTest extends TestCase
                     'first_name' => 'Jan',
                     'last_name' => 'Novák',
                     'tags' => ['vip', 'newsletter'],
+                    'points' => 42,
                 ],
             ],
         ], $rows);
@@ -274,51 +279,6 @@ final class LeadInsightsEventSubscriberTest extends TestCase
 
         $subscriber->onLeadDelete(new LeadEvent($anon, false));
         $queue->flushTo($buffer);
-
-        $this->assertSame([], $this->flushBufferAndGetNormalizedEventRows($buffer));
-    }
-
-    // ──────────────────────────────────────────────────────────────
-    // LEAD_POINTS_CHANGE  →  contact.points
-    // ──────────────────────────────────────────────────────────────
-
-    public function testPointsChangeRequestBody(): void
-    {
-        [$buffer, , $subscriber] = $this->makeStack([['id' => 3]]);
-
-        $lead = new Lead();
-        $lead->stubId = 8;
-        $lead->stubEmail = 'points@example.com';
-        $lead->stubFirstname = 'Pete';
-
-        $subscriber->onPointsChange(new PointsChangeEvent($lead, 10, 25));
-
-        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
-
-        $this->assertSame([
-            [
-                'event' => LeadEvents::LEAD_POINTS_CHANGE,
-                'channel' => 'contact',
-                'contact_id' => 8,
-                'segment_ids' => [3],
-                'properties' => [
-                    'email' => 'points@example.com',
-                    'first_name' => 'Pete',
-                    'old_points' => 10,
-                    'new_points' => 25,
-                ],
-            ],
-        ], $rows);
-    }
-
-    public function testAnonymousPointsChangeIsIgnored(): void
-    {
-        [$buffer, , $subscriber] = $this->makeStack();
-
-        $anon = new Lead();
-        $anon->anonymous = true;
-
-        $subscriber->onPointsChange(new PointsChangeEvent($anon, 0, 5));
 
         $this->assertSame([], $this->flushBufferAndGetNormalizedEventRows($buffer));
     }
@@ -407,6 +367,9 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         $lead->stubId = 77;
         $lead->stubEmail = 'id@example.com';
         $lead->stubFirstname = 'Ida';
+        // Explicit zero-score coverage: 0 must be emitted (not filtered as empty) because
+        // "contact has no points yet" is a meaningful analytical state, distinct from "points unknown".
+        $lead->stubPoints = 0;
 
         $subscriber->onLeadIdentified(new LeadEvent($lead, false));
 
@@ -421,6 +384,7 @@ final class LeadInsightsEventSubscriberTest extends TestCase
                 'properties' => [
                     'email' => 'id@example.com',
                     'first_name' => 'Ida',
+                    'points' => 0,
                 ],
             ],
         ], $rows);

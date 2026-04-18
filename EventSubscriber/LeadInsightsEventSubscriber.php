@@ -9,7 +9,6 @@ use Mautic\FormBundle\FormEvents;
 use Mautic\LeadBundle\Entity\Lead;
 use Mautic\LeadBundle\Event\LeadEvent;
 use Mautic\LeadBundle\Event\ListChangeEvent;
-use Mautic\LeadBundle\Event\PointsChangeEvent;
 use Mautic\LeadBundle\LeadEvents;
 use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
 use MauticPlugin\MauticInsightsBundle\Buffer\MauticEventBuffer;
@@ -37,7 +36,10 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
             // LEAD_POST_SAVE's ts strictly before the nested LEAD_IDENTIFIED ts, matching Mautic's actual top-level dispatch order.
             LeadEvents::LEAD_POST_SAVE => ['onLeadSave', 255],
             LeadEvents::LEAD_POST_DELETE => ['onLeadDelete', 0],
-            LeadEvents::LEAD_POINTS_CHANGE => ['onPointsChange', 0],
+            // LEAD_POINTS_CHANGE is intentionally not subscribed – MVP on the Insights side
+            // (funnel + realtime) has no scoring metrics. Re-add with `onPointsChange`
+            // when an MQL threshold dashboard, score velocity, or score-stagnation cohort
+            // feature is introduced.
             LeadEvents::LEAD_LIST_CHANGE => ['onListChange', 0],
             LeadEvents::LEAD_IDENTIFIED => ['onLeadIdentified', 0],
             FormEvents::FORM_ON_SUBMIT => ['onFormSubmit', 0],
@@ -76,20 +78,6 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
             LeadEvents::LEAD_POST_DELETE,
             $this->contextBuilder->buildPayloadFromLead($lead)
         );
-    }
-
-    public function onPointsChange(PointsChangeEvent $event): void
-    {
-        $lead = $event->getLead();
-        if ($lead->isAnonymous()) {
-            return;
-        }
-
-        $payload = $this->mergeLeadProperties($lead, [
-            'old_points' => $event->getOldPoints(),
-            'new_points' => $event->getNewPoints(),
-        ]);
-        $this->eventBuffer->push(LeadEvents::LEAD_POINTS_CHANGE, $payload);
     }
 
     public function onListChange(ListChangeEvent $event): void

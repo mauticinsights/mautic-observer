@@ -35,6 +35,13 @@ class Lead
     /** @var iterable<object> */
     public iterable $stubTags = [];
 
+    /**
+     * Null here = field unset in the test fixture → builder skips the `points` property.
+     * In real Mautic {@see \Mautic\LeadBundle\Entity\Lead::$points} is always `int` (default 0),
+     * so production payloads always include `points`. Tests that care about propagation set this explicitly.
+     */
+    public ?int $stubPoints = null;
+
     public function getId(): ?int
     {
         return $this->stubId;
@@ -84,5 +91,10 @@ class Lead
     public function getTags(): iterable
     {
         return $this->stubTags;
+    }
+
+    public function getPoints(): ?int
+    {
+        return $this->stubPoints;
     }
 }

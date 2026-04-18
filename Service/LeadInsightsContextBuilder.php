@@ -171,6 +171,17 @@ final class LeadInsightsContextBuilder
             $out['tags'] = $tags;
         }
 
+        // Current lead scoring snapshot (not a delta). Mautic's Lead::$points is a scalar int field
+        // on the entity, so this is a free read (no DB round-trip). Cheap enrichment unlocks coarse
+        // scoring analytics on any existing event (e.g. "form submits for contacts with points ≥ 30",
+        // or time-to-threshold via MIN(ts) WHERE points ≥ X) without subscribing to LEAD_POINTS_CHANGE.
+        // Note: during a request that mutates points, the value seen at LEAD_POST_SAVE may lag the
+        // scoring trigger by one dispatcher pass; acceptable fuzz for analytics, not for real-time alerting.
+        $points = $lead->getPoints();
+        if (\is_int($points)) {
+            $out['points'] = $points;
+        }
+
         return $out;
     }
 }
