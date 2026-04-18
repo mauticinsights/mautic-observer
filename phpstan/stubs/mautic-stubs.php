@@ -359,6 +359,52 @@ class Lead
     }
 }
 
+class LeadDevice
+{
+    public function getDevice(): ?string
+    {
+        return null;
+    }
+
+    public function getDeviceOsName(): ?string
+    {
+        return null;
+    }
+
+    public function getDeviceOsShortName(): ?string
+    {
+        return null;
+    }
+
+    public function getDeviceOsVersion(): ?string
+    {
+        return null;
+    }
+
+    public function getDeviceOsPlatform(): ?string
+    {
+        return null;
+    }
+
+    public function getDeviceBrand(): ?string
+    {
+        return null;
+    }
+
+    public function getDeviceModel(): ?string
+    {
+        return null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getClientInfo(): array
+    {
+        return [];
+    }
+}
+
 class LeadList
 {
     public ?int $deletedId = null;
@@ -832,6 +878,16 @@ class Hit
     ) {
     }
 
+    public function getId(): ?int
+    {
+        return null;
+    }
+
+    public function getCode(): ?int
+    {
+        return null;
+    }
+
     public function getPage(): ?Page
     {
         return $this->page;
@@ -840,6 +896,110 @@ class Hit
     public function getLead(): ?\Mautic\LeadBundle\Entity\Lead
     {
         return $this->lead;
+    }
+
+    public function getTrackingId(): ?string
+    {
+        return null;
+    }
+
+    public function getDateHit(): ?\DateTimeInterface
+    {
+        return null;
+    }
+
+    public function getUrl(): ?string
+    {
+        return null;
+    }
+
+    public function getUrlTitle(): ?string
+    {
+        return null;
+    }
+
+    public function getReferer(): ?string
+    {
+        return null;
+    }
+
+    public function getPageLanguage(): ?string
+    {
+        return null;
+    }
+
+    public function getCountry(): ?string
+    {
+        return null;
+    }
+
+    public function getRegion(): ?string
+    {
+        return null;
+    }
+
+    public function getCity(): ?string
+    {
+        return null;
+    }
+
+    public function getIsp(): ?string
+    {
+        return null;
+    }
+
+    public function getOrganization(): ?string
+    {
+        return null;
+    }
+
+    public function getSource(): ?string
+    {
+        return null;
+    }
+
+    public function getSourceId(): ?int
+    {
+        return null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getQuery(): array
+    {
+        return [];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getBrowserLanguages(): array
+    {
+        return [];
+    }
+
+    public function getEmail(): ?\Mautic\EmailBundle\Entity\Email
+    {
+        return null;
+    }
+
+    public function getRedirect(): ?Redirect
+    {
+        return null;
+    }
+
+    public function getDeviceStat(): ?\Mautic\LeadBundle\Entity\LeadDevice
+    {
+        return null;
+    }
+}
+
+class Redirect
+{
+    public function getId(): ?int
+    {
+        return null;
     }
 }
 
@@ -850,8 +1010,14 @@ use Mautic\PageBundle\Entity\Page;
 
 class PageHitEvent
 {
+    /**
+     * @param array<string, mixed> $clickthroughData
+     */
     public function __construct(
         private Hit $hit,
+        private ?int $code = null,
+        private array $clickthroughData = [],
+        private bool $unique = false,
     ) {
     }
 
@@ -863,6 +1029,24 @@ class PageHitEvent
     public function getPage(): ?Page
     {
         return $this->hit->getPage();
+    }
+
+    public function getCode(): ?int
+    {
+        return $this->code;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getClickthroughData(): array
+    {
+        return $this->clickthroughData;
+    }
+
+    public function isUnique(): bool
+    {
+        return $this->unique;
     }
 }
 
