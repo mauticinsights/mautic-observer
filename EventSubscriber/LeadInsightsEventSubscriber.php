@@ -80,6 +80,33 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
         );
     }
 
+    /**
+     * Segment membership change.
+     *
+     * Coverage caveat — this handler does NOT see changes made by `mautic:segments:update`
+     * (alias `mautic:segments:rebuild`) or any other code path that calls
+     * {@see \Mautic\LeadBundle\Model\ListModel::addLead()} / {@see \Mautic\LeadBundle\Model\ListModel::removeLead()}
+     * with `$batchProcess = true`. Mautic core short-circuits event dispatch in batch mode
+     * (see ListModel::addLead() line ~645 and ListModel::removeLead() line ~770: the
+     * `if ($batchProcess) { detach } elseif (hasListeners LEAD_LIST_CHANGE) { dispatch }` branch).
+     * This is intentional upstream behaviour to avoid flooding integrations during multi-million-row rebuilds.
+     *
+     * Signals we DO receive real-time:
+     *   - manual UI add/remove from a segment
+     *   - form-submit / API contact save that re-evaluates smart segment filters (non-batch path)
+     *   - contact merge reassignment
+     *
+     * Signals we MISS:
+     *   - `mautic:segments:update` cron / manual CLI rebuild
+     *   - smart-segment filter edits that trigger server-side batch reassignment
+     *   - bulk CSV imports followed by scheduled segment rebuild
+     *   - any code path that passes `$batchProcess = true` to addLead / removeLead
+     *
+     * If this drift becomes product-visible (e.g. stale segment counts after an admin edits
+     * a segment filter), add a reconcile cron — either an `mautic:insights:reconcile-segments`
+     * observer command that diffs `lead_lists_leads` against last known state and POSTs a
+     * snapshot, or a periodic pull on the Insights API side against Mautic's segment endpoints.
+     */
     public function onListChange(ListChangeEvent $event): void
     {
         $batch = $event->getLeads();
