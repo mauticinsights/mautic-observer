@@ -7,6 +7,7 @@ namespace MauticPlugin\MauticInsightsBundle\EventSubscriber;
 use Mautic\FormBundle\Event\SubmissionEvent;
 use Mautic\FormBundle\FormEvents;
 use Mautic\LeadBundle\Entity\Lead;
+use Mautic\LeadBundle\Event\ChannelSubscriptionChange;
 use Mautic\LeadBundle\Event\LeadEvent;
 use Mautic\LeadBundle\Event\ListChangeEvent;
 use Mautic\LeadBundle\LeadEvents;
@@ -42,6 +43,7 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
             // feature is introduced.
             LeadEvents::LEAD_LIST_CHANGE => ['onListChange', 0],
             LeadEvents::LEAD_IDENTIFIED => ['onLeadIdentified', 0],
+            LeadEvents::CHANNEL_SUBSCRIPTION_CHANGED => ['onChannelSubscriptionChanged', 0],
             FormEvents::FORM_ON_SUBMIT => ['onFormSubmit', 0],
         ];
     }
@@ -134,6 +136,49 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
         }
 
         $this->eventBuffer->push(LeadEvents::LEAD_IDENTIFIED, $this->contextBuilder->buildPayloadFromLead($lead));
+    }
+
+    /**
+     * DNC (Do-Not-Contact) status transition per communication channel (email, sms, …).
+     *
+     * Fired by Mautic on:
+     *   - user-triggered unsubscribe / resubscribe (preference-center, one-click unsubscribe header)
+     *   - bounce processor flipping status to "bounced"
+     *   - admin manual override via contact detail UI
+     *
+     * Status codes mirror {@see \Mautic\LeadBundle\Entity\DoNotContact}:
+     *   0 = contactable, 1 = unsubscribed, 2 = bounced, 3 = manual.
+     *
+     * Payload shape (consumed by {@see \App\MessageHandler\IngestMauticEventHandler}):
+     *   - top-level `channel` = the DNC channel (e.g. "email", "sms") – persisted onto
+     *     {@see \App\Entity\MauticEvent::$channel}.
+     *   - `properties.dnc_old_status` / `dnc_new_status` (int) – canonical, stable across Mautic versions.
+     *   - `properties.dnc_old_status_verb` / `dnc_new_status_verb` (string) – human-readable
+     *     for direct dashboard rendering without a lookup table.
+     *   - Plus all standard lead-derived props (points snapshot, utm tags when present).
+     *
+     * We push directly through {@see MauticEventBuffer} (not the deferred queue): subscription
+     * changes are low-frequency and high-value, so realtime surfacing outweighs batch amortisation.
+     */
+    public function onChannelSubscriptionChanged(ChannelSubscriptionChange $event): void
+    {
+        $lead = $event->getLead();
+        if ($lead->isAnonymous()) {
+            return;
+        }
+
+        $channel = $event->getChannel();
+        $extra = [
+            'dnc_old_status' => $event->getOldStatus(),
+            'dnc_new_status' => $event->getNewStatus(),
+            'dnc_old_status_verb' => $event->getOldStatusVerb(),
+            'dnc_new_status_verb' => $event->getNewStatusVerb(),
+        ];
+
+        $payload = $this->mergeLeadProperties($lead, $extra);
+        $payload['channel'] = $channel;
+
+        $this->eventBuffer->push(LeadEvents::CHANNEL_SUBSCRIPTION_CHANGED, $payload);
     }
 
     public function onFormSubmit(SubmissionEvent $event): void

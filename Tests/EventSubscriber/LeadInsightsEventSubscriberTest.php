@@ -11,6 +11,7 @@ use Mautic\FormBundle\FormEvents;
 use Mautic\LeadBundle\Entity\Lead;
 use Mautic\LeadBundle\Entity\LeadList;
 use Mautic\LeadBundle\Entity\Tag;
+use Mautic\LeadBundle\Event\ChannelSubscriptionChange;
 use Mautic\LeadBundle\Event\LeadEvent;
 use Mautic\LeadBundle\Event\ListChangeEvent;
 use Mautic\LeadBundle\LeadEvents;
@@ -115,6 +116,8 @@ final class LeadInsightsEventSubscriberTest extends TestCase
 
         $this->assertArrayHasKey(LeadEvents::LEAD_LIST_CHANGE, $map);
         $this->assertArrayHasKey(LeadEvents::LEAD_IDENTIFIED, $map);
+        $this->assertArrayHasKey(LeadEvents::CHANNEL_SUBSCRIPTION_CHANGED, $map);
+        $this->assertSame(['onChannelSubscriptionChanged', 0], $map[LeadEvents::CHANNEL_SUBSCRIPTION_CHANGED]);
         $this->assertArrayHasKey(FormEvents::FORM_ON_SUBMIT, $map);
 
         // LEAD_POINTS_CHANGE is intentionally NOT subscribed – not part of MVP (no scoring
@@ -398,6 +401,127 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         $anon->anonymous = true;
 
         $subscriber->onLeadIdentified(new LeadEvent($anon, false));
+
+        $this->assertSame([], $this->flushBufferAndGetNormalizedEventRows($buffer));
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // CHANNEL_SUBSCRIPTION_CHANGED  →  DNC status transition per channel
+    //
+    // Status codes mirror Mautic\LeadBundle\Entity\DoNotContact:
+    //   0 = contactable, 1 = unsubscribed, 2 = bounced, 3 = manual.
+    // Top-level `channel` passes through the DNC channel (email / sms / …),
+    // and both the int and verb forms of old/new status are emitted for
+    // analytics ergonomics (int stable, verb human-readable).
+    // ──────────────────────────────────────────────────────────────
+
+    public function testChannelSubscriptionChangedRequestBodyEmailUnsubscribe(): void
+    {
+        [$buffer, , $subscriber] = $this->makeStack([['id' => 5]]);
+
+        $lead = new Lead();
+        $lead->stubId = 100;
+        $lead->stubEmail = 'unsub@example.com';
+        $lead->stubFirstname = 'Una';
+        $lead->stubPoints = 12;
+
+        $subscriber->onChannelSubscriptionChanged(
+            new ChannelSubscriptionChange($lead, 'email', 0, 1)
+        );
+
+        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
+
+        $this->assertSame([
+            [
+                'event' => LeadEvents::CHANNEL_SUBSCRIPTION_CHANGED,
+                'channel' => 'email',
+                'contact_id' => 100,
+                'segment_ids' => [5],
+                'properties' => [
+                    'email' => 'unsub@example.com',
+                    'first_name' => 'Una',
+                    'points' => 12,
+                    'dnc_old_status' => 0,
+                    'dnc_new_status' => 1,
+                    'dnc_old_status_verb' => 'contactable',
+                    'dnc_new_status_verb' => 'unsubscribed',
+                ],
+            ],
+        ], $rows);
+    }
+
+    public function testChannelSubscriptionChangedForBouncedEmail(): void
+    {
+        [$buffer, , $subscriber] = $this->makeStack();
+
+        $lead = new Lead();
+        $lead->stubId = 101;
+        $lead->stubEmail = 'bounce@example.com';
+
+        $subscriber->onChannelSubscriptionChanged(
+            new ChannelSubscriptionChange($lead, 'email', 0, 2)
+        );
+
+        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame(LeadEvents::CHANNEL_SUBSCRIPTION_CHANGED, $rows[0]['event']);
+        $this->assertSame('email', $rows[0]['channel']);
+        $this->assertSame(2, $rows[0]['properties']['dnc_new_status']);
+        $this->assertSame('bounced', $rows[0]['properties']['dnc_new_status_verb']);
+    }
+
+    public function testChannelSubscriptionChangedForManualSmsOverride(): void
+    {
+        [$buffer, , $subscriber] = $this->makeStack();
+
+        $lead = new Lead();
+        $lead->stubId = 102;
+        $lead->stubEmail = 'sms@example.com';
+
+        $subscriber->onChannelSubscriptionChanged(
+            new ChannelSubscriptionChange($lead, 'sms', 0, 3)
+        );
+
+        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('sms', $rows[0]['channel'], 'Top-level channel must pass through the DNC channel unchanged');
+        $this->assertSame(3, $rows[0]['properties']['dnc_new_status']);
+        $this->assertSame('manual', $rows[0]['properties']['dnc_new_status_verb']);
+    }
+
+    public function testChannelSubscriptionResubscribeEmitsContactableVerb(): void
+    {
+        [$buffer, , $subscriber] = $this->makeStack();
+
+        $lead = new Lead();
+        $lead->stubId = 103;
+        $lead->stubEmail = 'resub@example.com';
+
+        // 1 → 0 resubscribe (e.g. user clicked "Resubscribe" on preference center).
+        $subscriber->onChannelSubscriptionChanged(
+            new ChannelSubscriptionChange($lead, 'email', 1, 0)
+        );
+
+        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
+
+        $this->assertSame('unsubscribed', $rows[0]['properties']['dnc_old_status_verb']);
+        $this->assertSame('contactable', $rows[0]['properties']['dnc_new_status_verb']);
+        $this->assertSame(1, $rows[0]['properties']['dnc_old_status']);
+        $this->assertSame(0, $rows[0]['properties']['dnc_new_status']);
+    }
+
+    public function testAnonymousChannelSubscriptionChangedIsIgnored(): void
+    {
+        [$buffer, , $subscriber] = $this->makeStack();
+
+        $anon = new Lead();
+        $anon->anonymous = true;
+
+        $subscriber->onChannelSubscriptionChanged(
+            new ChannelSubscriptionChange($anon, 'email', 0, 1)
+        );
 
         $this->assertSame([], $this->flushBufferAndGetNormalizedEventRows($buffer));
     }

@@ -19,4 +19,6 @@ final class LeadEvents
     public const LIST_POST_SAVE = 'mautic.lead_list_post_save';
 
     public const LIST_POST_DELETE = 'mautic.lead_list_post_delete';
+
+    public const CHANNEL_SUBSCRIPTION_CHANGED = 'mautic.lead_channel_subscription_changed';
 }

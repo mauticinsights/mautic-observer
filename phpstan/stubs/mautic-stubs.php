@@ -732,6 +732,8 @@ final class LeadEvents
     public const LIST_POST_SAVE = 'mautic.lead_list_post_save';
 
     public const LIST_POST_DELETE = 'mautic.lead_list_post_delete';
+
+    public const CHANNEL_SUBSCRIPTION_CHANGED = 'mautic.lead_channel_subscription_changed';
 }
 
 namespace Mautic\LeadBundle\Event;
@@ -845,6 +847,47 @@ class ListChangeEvent extends \Symfony\Contracts\EventDispatcher\Event
     public function wasAdded(): bool
     {
         return $this->added;
+    }
+}
+
+class ChannelSubscriptionChange extends \Symfony\Contracts\EventDispatcher\Event
+{
+    public function __construct(
+        private Lead $lead,
+        private string $channel,
+        private int $oldStatus,
+        private int $newStatus,
+    ) {
+    }
+
+    public function getLead(): Lead
+    {
+        return $this->lead;
+    }
+
+    public function getChannel(): string
+    {
+        return $this->channel;
+    }
+
+    public function getOldStatus(): int
+    {
+        return $this->oldStatus;
+    }
+
+    public function getNewStatus(): int
+    {
+        return $this->newStatus;
+    }
+
+    public function getOldStatusVerb(): string
+    {
+        return '';
+    }
+
+    public function getNewStatusVerb(): string
+    {
+        return '';
     }
 }
 
