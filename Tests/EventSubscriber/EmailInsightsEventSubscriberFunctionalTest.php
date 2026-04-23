@@ -11,14 +11,10 @@ use Mautic\EmailBundle\Event\EmailEvent;
 use Mautic\EmailBundle\Event\EmailOpenEvent;
 use Mautic\EmailBundle\Event\EmailSendEvent;
 use Mautic\EmailBundle\Event\QueueEmailEvent;
-use Mautic\EmailBundle\Event\TransportWebhookEvent;
 use Mautic\EmailBundle\Mailer\Message\MauticMessage;
-use Mautic\LeadBundle\Entity\Lead;
 use Mautic\LeadBundle\Entity\LeadList;
 use Mautic\LeadBundle\Model\LeadModel;
 use Mautic\PluginBundle\Entity\Integration;
-use Mautic\PointBundle\Entity\TriggerEvent as PointTriggerEvent;
-use Mautic\PointBundle\Event\TriggerExecutedEvent;
 use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
 use MauticPlugin\MauticInsightsBundle\Buffer\DisabledPersistentEventBuffer;
 use MauticPlugin\MauticInsightsBundle\Buffer\MauticEventBuffer;
@@ -57,14 +53,10 @@ final class EmailInsightsEventSubscriberFunctionalTest extends TestCase
         $map = EmailInsightsEventSubscriber::getSubscribedEvents();
         $this->assertArrayHasKey(EmailEvents::EMAIL_ON_OPEN, $map);
         $this->assertArrayHasKey(EmailEvents::EMAIL_ON_SEND, $map);
-        $this->assertArrayHasKey(EmailEvents::EMAIL_ON_DISPLAY, $map);
         $this->assertArrayHasKey(EmailEvents::EMAIL_POST_SAVE, $map);
         $this->assertArrayHasKey(EmailEvents::EMAIL_POST_DELETE, $map);
         $this->assertArrayHasKey(EmailEvents::EMAIL_ON_REPLY, $map);
         $this->assertArrayHasKey(EmailEvents::EMAIL_FAILED, $map);
-        $this->assertArrayHasKey(EmailEvents::EMAIL_RESEND, $map);
-        $this->assertArrayHasKey(EmailEvents::ON_SENT_EMAIL_TO_USER, $map);
-        $this->assertArrayHasKey(EmailEvents::ON_TRANSPORT_WEBHOOK, $map);
     }
 
     public function testEmailPostSaveCreatedAndUpdatedPayloadShapes(): void
@@ -289,45 +281,6 @@ final class EmailInsightsEventSubscriberFunctionalTest extends TestCase
         $this->assertSame([$expectedFullRow, $expectedArrayLeadRow], $rows);
     }
 
-    public function testEmailDisplayDeferredUsesSamePayloadShapeAsSendWithDifferentEventName(): void
-    {
-        $client = $this->createCapturingEventHttpClient();
-        $buffer = $this->createMauticEventBufferForTests($client);
-
-        $leadModel = new LeadModel();
-        $leadModel->listRows = [['id' => 5]];
-
-        $emailBuilder = new EmailInsightsContextBuilder(new LeadInsightsContextBuilder($leadModel));
-        $queue = new DeferredOutboundEventQueue();
-        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder, $this->createActiveTestOutboundTokenProvider());
-
-        $display = new EmailSendEvent();
-        $display->internalSend = false;
-        $display->lead = $this->makeLead(42, 'display@example.com');
-        $display->email = new Email(7, 'Browser', 'Hello');
-        $display->source = ['campaign', 100];
-
-        $subscriber->onEmailDisplay($display);
-        $queue->flushTo($buffer);
-
-        $expectedRow = [
-            'event' => EmailEvents::EMAIL_ON_DISPLAY,
-            'channel' => 'email',
-            'email_id' => 7,
-            'properties' => [
-                'email_name' => 'Browser',
-                'subject' => 'Hello',
-                'email' => 'display@example.com',
-            ],
-            'campaign_id' => 100,
-            'contact_id' => 42,
-            'segment_ids' => [5],
-        ];
-
-        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
-        $this->assertSame([$expectedRow], $rows);
-    }
-
     public function testEmailPostDeletePayload(): void
     {
         $client = $this->createCapturingEventHttpClient();
@@ -505,7 +458,7 @@ final class EmailInsightsEventSubscriberFunctionalTest extends TestCase
         $this->assertSame(5, $rows[0]['contact_id']);
     }
 
-    public function testEmailFailedAndResendQueuePayload(): void
+    public function testEmailFailedQueuePayload(): void
     {
         $client = $this->createCapturingEventHttpClient();
         $buffer = $this->createMauticEventBufferForTests($client);
@@ -530,7 +483,6 @@ final class EmailInsightsEventSubscriberFunctionalTest extends TestCase
 
         $msg = new MauticMessage('Subj line', 'abc-hash', [$from], [$to]);
         $subscriber->onEmailFailed(new QueueEmailEvent($msg));
-        $subscriber->onEmailResend(new QueueEmailEvent($msg));
         $queue->flushTo($buffer);
 
         $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
@@ -545,85 +497,6 @@ final class EmailInsightsEventSubscriberFunctionalTest extends TestCase
                 'event' => EmailEvents::EMAIL_FAILED,
                 'channel' => 'email',
                 'properties' => $expectedProps,
-            ],
-            [
-                'event' => EmailEvents::EMAIL_RESEND,
-                'channel' => 'email',
-                'properties' => $expectedProps,
-            ],
-        ], $rows);
-    }
-
-    public function testOnSentEmailToUserPayload(): void
-    {
-        $client = $this->createCapturingEventHttpClient();
-        $buffer = $this->createMauticEventBufferForTests($client);
-
-        $leadModel = new LeadModel();
-        $leadModel->listRows = [];
-        $emailBuilder = new EmailInsightsContextBuilder(new LeadInsightsContextBuilder($leadModel));
-        $queue = new DeferredOutboundEventQueue();
-        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder, $this->createActiveTestOutboundTokenProvider());
-
-        $lead = $this->makeLead(88, 'user@example.com');
-        $trigger = new PointTriggerEvent(12, 'Notify user', 'email.send');
-        $subscriber->onSentEmailToUser(new TriggerExecutedEvent($trigger, $lead));
-        $queue->flushTo($buffer);
-
-        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
-        $this->assertCount(1, $rows);
-        $this->assertSame(EmailEvents::ON_SENT_EMAIL_TO_USER, $rows[0]['event']);
-        $this->assertSame(88, $rows[0]['contact_id']);
-        $this->assertSame([
-            'point_trigger_event_id' => 12,
-            'point_trigger_event_name' => 'Notify user',
-            'point_trigger_event_type' => 'email.send',
-            'email' => 'user@example.com',
-        ], $rows[0]['properties']);
-    }
-
-    public function testOnSentEmailToUserSkippedWhenLeadHasNoId(): void
-    {
-        $client = $this->createCapturingEventHttpClient();
-        $buffer = $this->createMauticEventBufferForTests($client);
-
-        $leadModel = new LeadModel();
-        $emailBuilder = new EmailInsightsContextBuilder(new LeadInsightsContextBuilder($leadModel));
-        $queue = new DeferredOutboundEventQueue();
-        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder, $this->createActiveTestOutboundTokenProvider());
-
-        $lead = new Lead();
-        $lead->stubId = null;
-        $subscriber->onSentEmailToUser(new TriggerExecutedEvent(new PointTriggerEvent(1, 'x', 't'), $lead));
-        $queue->flushTo($buffer);
-
-        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
-        $this->assertSame([], $rows);
-    }
-
-    public function testTransportWebhookPayload(): void
-    {
-        $client = $this->createCapturingEventHttpClient();
-        $buffer = $this->createMauticEventBufferForTests($client);
-
-        $leadModel = new LeadModel();
-        $emailBuilder = new EmailInsightsContextBuilder(new LeadInsightsContextBuilder($leadModel));
-        $queue = new DeferredOutboundEventQueue();
-        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder, $this->createActiveTestOutboundTokenProvider());
-
-        $req = Request::create('/webhooks/mailgun', 'POST', ['foo' => 'bar']);
-        $subscriber->onTransportWebhook(new TransportWebhookEvent($req));
-        $queue->flushTo($buffer);
-
-        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
-        $this->assertSame([
-            [
-                'event' => EmailEvents::ON_TRANSPORT_WEBHOOK,
-                'channel' => 'email',
-                'properties' => [
-                    'http_method' => 'POST',
-                    'path' => '/webhooks/mailgun',
-                ],
             ],
         ], $rows);
     }

@@ -11,7 +11,7 @@ use DateTimeZone;
  * FIFO queue for events that must not hit {@see MauticEventBuffer} until request shutdown flush.
  *
  * Shared singleton: {@see \MauticPlugin\MauticInsightsBundle\EventSubscriber\LeadInsightsEventSubscriber},
- * {@see \MauticPlugin\MauticInsightsBundle\EventSubscriber\EmailInsightsEventSubscriber} (opens, sends, display, reply, entity save/delete, queue fail/resend, transport webhook, point trigger mail),
+ * {@see \MauticPlugin\MauticInsightsBundle\EventSubscriber\EmailInsightsEventSubscriber} (opens, sends, reply, entity save/delete, queue fail),
  * {@see \MauticPlugin\MauticInsightsBundle\EventSubscriber\CampaignAnalyticsEventSubscriber} (campaign save/delete),
  * {@see \MauticPlugin\MauticInsightsBundle\EventSubscriber\SegmentInsightsEventSubscriber} (segment save/delete),
  * {@see \MauticPlugin\MauticInsightsBundle\EventSubscriber\PageInsightsEventSubscriber} (page hit),

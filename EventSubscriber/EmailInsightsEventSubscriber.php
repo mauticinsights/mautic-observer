@@ -9,15 +9,13 @@ use Mautic\EmailBundle\Event\EmailEvent;
 use Mautic\EmailBundle\Event\EmailOpenEvent;
 use Mautic\EmailBundle\Event\EmailSendEvent;
 use Mautic\EmailBundle\Event\QueueEmailEvent;
-use Mautic\EmailBundle\Event\TransportWebhookEvent;
-use Mautic\PointBundle\Event\TriggerExecutedEvent;
 use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
 use MauticPlugin\MauticInsightsBundle\Service\EmailInsightsContextBuilder;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsOutboundTokenProvider;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
- * Email entity lifecycle, opens/replies, sends/display, queue fail/resend, transport webhooks, point-trigger mail →
+ * Email entity lifecycle, opens/replies, sends, queue failures →
  * shared {@see DeferredOutboundEventQueue}, POST {@see \MauticPlugin\MauticInsightsBundle\InsightsApiConfig::EVENT_NOTIFY_URL}.
  */
 final class EmailInsightsEventSubscriber implements EventSubscriberInterface
@@ -34,14 +32,10 @@ final class EmailInsightsEventSubscriber implements EventSubscriberInterface
         return [
             EmailEvents::EMAIL_ON_OPEN => ['onEmailOpen', 0],
             EmailEvents::EMAIL_ON_SEND => ['onEmailSend', 0],
-            EmailEvents::EMAIL_ON_DISPLAY => ['onEmailDisplay', 0],
             EmailEvents::EMAIL_POST_SAVE => ['onEmailPostSave', 0],
             EmailEvents::EMAIL_POST_DELETE => ['onEmailPostDelete', 0],
             EmailEvents::EMAIL_ON_REPLY => ['onEmailReply', 0],
             EmailEvents::EMAIL_FAILED => ['onEmailFailed', 0],
-            EmailEvents::EMAIL_RESEND => ['onEmailResend', 0],
-            EmailEvents::ON_SENT_EMAIL_TO_USER => ['onSentEmailToUser', 0],
-            EmailEvents::ON_TRANSPORT_WEBHOOK => ['onTransportWebhook', 0],
         ];
     }
 
@@ -70,21 +64,6 @@ final class EmailInsightsEventSubscriber implements EventSubscriberInterface
     }
 
     /**
-     * Browser preview of email HTML — same payload shape as {@see EmailEvents::EMAIL_ON_SEND} ({@see EmailInsightsContextBuilder::buildEmailSendPayload}).
-     */
-    public function onEmailDisplay(EmailSendEvent $event): void
-    {
-        if (null === $this->outboundTokenProvider->getToken()) {
-            return;
-        }
-
-        $payload = $this->emailContextBuilder->buildEmailSendPayload($event);
-        if (null !== $payload) {
-            $this->deferredOutboundEventQueue->enqueue(EmailEvents::EMAIL_ON_DISPLAY, $payload);
-        }
-    }
-
-    /**
      * Inbound reply — same {@see EmailOpenEvent} context as {@see EmailEvents::EMAIL_ON_OPEN}.
      */
     public function onEmailReply(EmailOpenEvent $event): void
@@ -108,42 +87,6 @@ final class EmailInsightsEventSubscriber implements EventSubscriberInterface
         $this->deferredOutboundEventQueue->enqueue(
             EmailEvents::EMAIL_FAILED,
             $this->emailContextBuilder->buildQueueEmailPayload($event)
-        );
-    }
-
-    public function onEmailResend(QueueEmailEvent $event): void
-    {
-        if (null === $this->outboundTokenProvider->getToken()) {
-            return;
-        }
-
-        $this->deferredOutboundEventQueue->enqueue(
-            EmailEvents::EMAIL_RESEND,
-            $this->emailContextBuilder->buildQueueEmailPayload($event)
-        );
-    }
-
-    public function onSentEmailToUser(TriggerExecutedEvent $event): void
-    {
-        if (null === $this->outboundTokenProvider->getToken()) {
-            return;
-        }
-
-        $payload = $this->emailContextBuilder->buildSentEmailToUserPayload($event);
-        if (null !== $payload) {
-            $this->deferredOutboundEventQueue->enqueue(EmailEvents::ON_SENT_EMAIL_TO_USER, $payload);
-        }
-    }
-
-    public function onTransportWebhook(TransportWebhookEvent $event): void
-    {
-        if (null === $this->outboundTokenProvider->getToken()) {
-            return;
-        }
-
-        $this->deferredOutboundEventQueue->enqueue(
-            EmailEvents::ON_TRANSPORT_WEBHOOK,
-            $this->emailContextBuilder->buildTransportWebhookPayload($event)
         );
     }
 

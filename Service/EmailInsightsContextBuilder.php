@@ -9,9 +9,7 @@ use Mautic\EmailBundle\Entity\Stat;
 use Mautic\EmailBundle\Event\EmailOpenEvent;
 use Mautic\EmailBundle\Event\EmailSendEvent;
 use Mautic\EmailBundle\Event\QueueEmailEvent;
-use Mautic\EmailBundle\Event\TransportWebhookEvent;
 use Mautic\LeadBundle\Entity\Lead;
-use Mautic\PointBundle\Event\TriggerExecutedEvent;
 
 final class EmailInsightsContextBuilder
 {
@@ -85,7 +83,7 @@ final class EmailInsightsContextBuilder
     }
 
     /**
-     * Failed / resend queue — metadata from {@see \Mautic\EmailBundle\Mailer\Message\MauticMessage}.
+     * Failed queue — metadata from {@see \Mautic\EmailBundle\Mailer\Message\MauticMessage}.
      *
      * @return array<string, mixed>
      */
@@ -126,62 +124,6 @@ final class EmailInsightsContextBuilder
             'channel' => 'email',
             'properties' => $properties,
         ];
-    }
-
-    /**
-     * Transport provider webhook — request line only (no body; avoids leaking secrets).
-     *
-     * @return array<string, mixed>
-     */
-    public function buildTransportWebhookPayload(TransportWebhookEvent $event): array
-    {
-        $request = $event->getRequest();
-
-        return [
-            'channel' => 'email',
-            'properties' => [
-                'http_method' => $request->getMethod(),
-                'path' => $request->getPathInfo(),
-            ],
-        ];
-    }
-
-    /**
-     * Point trigger “email to user” — {@see \Mautic\EmailBundle\EmailEvents::ON_SENT_EMAIL_TO_USER}.
-     *
-     * @return array<string, mixed>|null
-     */
-    public function buildSentEmailToUserPayload(TriggerExecutedEvent $event): ?array
-    {
-        $lead = $event->getLead();
-        $leadId = $lead->getId();
-        if (null === $leadId || $leadId <= 0) {
-            return null;
-        }
-
-        $te = $event->getTriggerEvent();
-        $properties = [];
-        if (method_exists($te, 'getId')) {
-            $tid = $te->getId();
-            if (null !== $tid) {
-                $properties['point_trigger_event_id'] = (int) $tid;
-            }
-        }
-        if (method_exists($te, 'getName')) {
-            $properties['point_trigger_event_name'] = (string) $te->getName();
-        }
-        if (method_exists($te, 'getType')) {
-            $properties['point_trigger_event_type'] = (string) $te->getType();
-        }
-
-        $payload = [
-            'channel' => 'email',
-            'contact_id' => (int) $leadId,
-            'properties' => $properties,
-        ];
-        $this->mergeAugmentation($payload, $this->leadInsights->buildLeadAugmentation($lead));
-
-        return $payload;
     }
 
     /**
