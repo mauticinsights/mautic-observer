@@ -36,6 +36,15 @@ class Lead
     public iterable $stubTags = [];
 
     /**
+     * Simulates {@see \Mautic\CoreBundle\Entity\CommonEntity::getChanges()} for pseudo-event tests.
+     * Shape matches Mautic core: {@code tags} = {@code added}/{@code removed} string lists;
+     * {@code stage} = {@code [old, new]} (ids or objects with {@code getId()}).
+     *
+     * @var array<string, mixed>
+     */
+    public array $stubChanges = [];
+
+    /**
      * Null here = field unset in the test fixture → builder skips the `points` property.
      * In real Mautic {@see \Mautic\LeadBundle\Entity\Lead::$points} is always `int` (default 0),
      * so production payloads always include `points`. Tests that care about propagation set this explicitly.
@@ -96,5 +105,13 @@ class Lead
     public function getPoints(): ?int
     {
         return $this->stubPoints;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getChanges(bool $includePast = false): array
+    {
+        return $this->stubChanges;
     }
 }

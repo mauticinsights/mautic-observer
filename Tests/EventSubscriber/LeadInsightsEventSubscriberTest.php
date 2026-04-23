@@ -16,6 +16,7 @@ use Mautic\PluginBundle\Entity\Integration;
 use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
 use MauticPlugin\MauticInsightsBundle\Buffer\DisabledPersistentEventBuffer;
 use MauticPlugin\MauticInsightsBundle\Buffer\MauticEventBuffer;
+use MauticPlugin\MauticInsightsBundle\Event\InsightsLeadPseudoEvents;
 use MauticPlugin\MauticInsightsBundle\EventSubscriber\EventBufferFlushSubscriber;
 use MauticPlugin\MauticInsightsBundle\EventSubscriber\LeadInsightsEventSubscriber;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
@@ -525,6 +526,94 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         );
 
         $this->assertSame([], $this->flushBufferAndGetNormalizedEventRows($buffer));
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // LEAD_POST_SAVE → pseudo tag / stage events (Insights-only names)
+    // ──────────────────────────────────────────────────────────────
+
+    public function testLeadPostSaveWithTagDiffEmitsTagsPseudoAfterPostSave(): void
+    {
+        [$buffer, $queue, $subscriber] = $this->makeStack([['id' => 5], ['id' => 9]]);
+        $lead = $this->makeFullLead();
+        $lead->stubChanges = [
+            'tags' => ['added' => ['trial'], 'removed' => ['newsletter']],
+        ];
+
+        $subscriber->onLeadSave(new LeadEvent($lead, false));
+        $queue->flushTo($buffer);
+
+        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
+        $this->assertCount(2, $rows);
+        $this->assertSame(LeadEvents::LEAD_POST_SAVE, $rows[0]['event']);
+        $this->assertSame(InsightsLeadPseudoEvents::LEAD_TAGS_CHANGE, $rows[1]['event']);
+        $this->assertSame(42, $rows[1]['contact_id']);
+        $this->assertSame(['trial'], $rows[1]['properties']['tags_added']);
+        $this->assertSame(['newsletter'], $rows[1]['properties']['tags_removed']);
+    }
+
+    public function testLeadPostSaveWithStageDiffEmitsStagePseudoAfterPostSave(): void
+    {
+        [$buffer, $queue, $subscriber] = $this->makeStack([['id' => 5]]);
+        $lead = $this->makeFullLead();
+        $lead->stubChanges = ['stage' => [1, 2]];
+
+        $subscriber->onLeadSave(new LeadEvent($lead, false));
+        $queue->flushTo($buffer);
+
+        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
+        $this->assertCount(2, $rows);
+        $this->assertSame(LeadEvents::LEAD_POST_SAVE, $rows[0]['event']);
+        $this->assertSame(InsightsLeadPseudoEvents::LEAD_STAGE_CHANGE, $rows[1]['event']);
+        $this->assertSame(1, $rows[1]['properties']['stage_old_id']);
+        $this->assertSame(2, $rows[1]['properties']['stage_new_id']);
+    }
+
+    public function testLeadPostSaveWithTagsAndStageEmitsPostSaveThenBothPseudosInOrder(): void
+    {
+        [$buffer, $queue, $subscriber] = $this->makeStack([]);
+        $lead = $this->makeFullLead();
+        $lead->stubChanges = [
+            'tags' => ['added' => ['x'], 'removed' => []],
+            'stage' => [10, 20],
+        ];
+
+        $subscriber->onLeadSave(new LeadEvent($lead, false));
+        $queue->flushTo($buffer);
+
+        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
+        $this->assertCount(3, $rows);
+        $this->assertSame(LeadEvents::LEAD_POST_SAVE, $rows[0]['event']);
+        $this->assertSame(InsightsLeadPseudoEvents::LEAD_TAGS_CHANGE, $rows[1]['event']);
+        $this->assertSame(InsightsLeadPseudoEvents::LEAD_STAGE_CHANGE, $rows[2]['event']);
+    }
+
+    public function testLeadPostSaveWithEmptyTagDiffDoesNotEmitTagsPseudo(): void
+    {
+        [$buffer, $queue, $subscriber] = $this->makeStack([]);
+        $lead = $this->makeFullLead();
+        $lead->stubChanges = ['tags' => ['added' => [], 'removed' => []]];
+
+        $subscriber->onLeadSave(new LeadEvent($lead, false));
+        $queue->flushTo($buffer);
+
+        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
+        $this->assertCount(1, $rows);
+        $this->assertSame(LeadEvents::LEAD_POST_SAVE, $rows[0]['event']);
+    }
+
+    public function testLeadPostSaveWithNoopStageIdsDoesNotEmitStagePseudo(): void
+    {
+        [$buffer, $queue, $subscriber] = $this->makeStack([]);
+        $lead = $this->makeFullLead();
+        $lead->stubChanges = ['stage' => [3, 3]];
+
+        $subscriber->onLeadSave(new LeadEvent($lead, false));
+        $queue->flushTo($buffer);
+
+        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
+        $this->assertCount(1, $rows);
+        $this->assertSame(LeadEvents::LEAD_POST_SAVE, $rows[0]['event']);
     }
 
     // ──────────────────────────────────────────────────────────────

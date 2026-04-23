@@ -357,6 +357,14 @@ class Lead
     {
         return [];
     }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getChanges(bool $includePast = false): array
+    {
+        return [];
+    }
 }
 
 class LeadDevice

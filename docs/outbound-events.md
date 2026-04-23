@@ -4,6 +4,19 @@ The plugin lives in **`mautic-observer/`** (Symfony bundle `MauticPlugin\MauticI
 
 ---
 
+## Lead pseudo-events — tags & stage (`LeadInsightsEventSubscriber`)
+
+Mautic 5 does **not** define `LeadEvents::LEAD_TAGS_CHANGE` or `LEAD_STAGE_CHANGE`. The bundle emits these **Insights-only** `event` strings when handling **`LEAD_POST_SAVE`**, after reading **`$lead->getChanges()`** on the entity (not `$event->getChanges()`, which would reset change tracking for core listeners):
+
+| Outbound `event` | Constant (plugin) | When emitted |
+|------------------|-------------------|--------------|
+| `mautic.lead_tags_change` | `InsightsLeadPseudoEvents::LEAD_TAGS_CHANGE` | Non-empty `tags.added` or `tags.removed` in entity changes |
+| `mautic.lead_stage_change` | `InsightsLeadPseudoEvents::LEAD_STAGE_CHANGE` | `stage` tuple normalizes to different old/new positive ids |
+
+Same **deferred** queue as `LEAD_POST_SAVE`, so one Mautic save can produce **one POST_SAVE row plus zero–two pseudo rows** in stable order. App mirrors constants on `App\Event\Mautic\LeadEvents`.
+
+---
+
 ## Email events (`EmailInsightsEventSubscriber`)
 
 ### Currently subscribed and sent

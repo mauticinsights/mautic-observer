@@ -11,6 +11,7 @@ use Mautic\LeadBundle\Event\ListChangeEvent;
 use Mautic\LeadBundle\LeadEvents;
 use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
 use MauticPlugin\MauticInsightsBundle\Buffer\MauticEventBuffer;
+use MauticPlugin\MauticInsightsBundle\Event\InsightsLeadPseudoEvents;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsOutboundTokenProvider;
 use MauticPlugin\MauticInsightsBundle\Service\LeadInsightsContextBuilder;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
@@ -70,6 +71,7 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
         }
 
         $this->deferredLeadOutboundQueue->enqueue(LeadEvents::LEAD_POST_SAVE, $payload);
+        $this->enqueueLeadPseudoEventsFromPostSaveChanges($lead);
     }
 
     public function onLeadDelete(LeadEvent $event): void
@@ -238,5 +240,109 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
         $base['properties'] = array_merge($existing, $propertyExtras);
 
         return $base;
+    }
+
+    /**
+     * Emits Insights-only pseudo-events when {@see Lead::getChanges()} reports tag or stage
+     * mutations in the same request as {@see LeadEvents::LEAD_POST_SAVE}.
+     *
+     * Reads {@code $lead->getChanges()} only — not {@see \Mautic\CoreBundle\Event\CommonEvent::getChanges()}
+     * on {@see LeadEvent}, because the latter snapshots entity changes and calls {@see Lead::resetChanges()},
+     * which would break Mautic core listeners that rely on the entity change log (e.g. audit log).
+     */
+    private function enqueueLeadPseudoEventsFromPostSaveChanges(Lead $lead): void
+    {
+        /** @var array<string, mixed> $changes */
+        $changes = $lead->getChanges();
+        if ([] === $changes) {
+            return;
+        }
+
+        if (isset($changes['tags']) && \is_array($changes['tags'])) {
+            $added = self::normalizeDistinctStringList($changes['tags']['added'] ?? null);
+            $removed = self::normalizeDistinctStringList($changes['tags']['removed'] ?? null);
+            if ([] !== $added || [] !== $removed) {
+                $this->deferredLeadOutboundQueue->enqueue(
+                    InsightsLeadPseudoEvents::LEAD_TAGS_CHANGE,
+                    $this->mergeLeadProperties($lead, [
+                        'tags_added' => $added,
+                        'tags_removed' => $removed,
+                    ])
+                );
+            }
+        }
+
+        if (!isset($changes['stage'])) {
+            return;
+        }
+        $pair = $changes['stage'];
+        if (!\is_array($pair)) {
+            return;
+        }
+        $values = array_values($pair);
+        $oldRaw = $values[0] ?? null;
+        $newRaw = $values[1] ?? null;
+        $oldId = self::normalizePositiveIntOrNull($oldRaw);
+        $newId = self::normalizePositiveIntOrNull($newRaw);
+        if ($oldId === $newId) {
+            return;
+        }
+
+        $this->deferredLeadOutboundQueue->enqueue(
+            InsightsLeadPseudoEvents::LEAD_STAGE_CHANGE,
+            $this->mergeLeadProperties($lead, [
+                'stage_old_id' => $oldId,
+                'stage_new_id' => $newId,
+            ])
+        );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function normalizeDistinctStringList(mixed $list): array
+    {
+        if (!\is_array($list)) {
+            return [];
+        }
+        $out = [];
+        foreach ($list as $item) {
+            if (!\is_string($item) || '' === $item) {
+                continue;
+            }
+            $out[$item] = true;
+        }
+        ksort($out);
+
+        return array_keys($out);
+    }
+
+    private static function normalizePositiveIntOrNull(mixed $v): ?int
+    {
+        if (null === $v || false === $v) {
+            return null;
+        }
+        if (\is_int($v)) {
+            return $v > 0 ? $v : null;
+        }
+        if (\is_float($v)) {
+            $i = (int) $v;
+
+            return $i > 0 ? $i : null;
+        }
+        if (\is_string($v)) {
+            $t = trim($v);
+            if ('' === $t || !is_numeric($t)) {
+                return null;
+            }
+            $i = (int) $t;
+
+            return $i > 0 ? $i : null;
+        }
+        if (\is_object($v) && method_exists($v, 'getId')) {
+            return self::normalizePositiveIntOrNull($v->getId());
+        }
+
+        return null;
     }
 }
