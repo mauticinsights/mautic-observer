@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace MauticPlugin\MauticInsightsBundle\EventSubscriber;
 
-use Mautic\FormBundle\Event\SubmissionEvent;
-use Mautic\FormBundle\FormEvents;
 use Mautic\LeadBundle\Entity\Lead;
 use Mautic\LeadBundle\Event\ChannelSubscriptionChange;
 use Mautic\LeadBundle\Event\LeadEvent;
@@ -46,7 +44,6 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
             LeadEvents::LEAD_LIST_CHANGE => ['onListChange', 0],
             LeadEvents::LEAD_IDENTIFIED => ['onLeadIdentified', 0],
             LeadEvents::CHANNEL_SUBSCRIPTION_CHANGED => ['onChannelSubscriptionChanged', 0],
-            FormEvents::FORM_ON_SUBMIT => ['onFormSubmit', 0],
         ];
     }
 
@@ -201,44 +198,6 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
         $payload['channel'] = $channel;
 
         $this->eventBuffer->push(LeadEvents::CHANNEL_SUBSCRIPTION_CHANGED, $payload);
-    }
-
-    public function onFormSubmit(SubmissionEvent $event): void
-    {
-        if (null === $this->outboundTokenProvider->getToken()) {
-            return;
-        }
-
-        $submission = $event->getSubmission();
-        $payload = [
-            'channel' => 'form',
-            'properties' => [],
-        ];
-
-        if (method_exists($submission, 'getForm')) {
-            $form = $submission->getForm();
-            if (\is_object($form) && method_exists($form, 'getId')) {
-                $formId = $form->getId();
-                if (null !== $formId) {
-                    $payload['properties']['form_id'] = $formId;
-                }
-            }
-        }
-
-        if (method_exists($submission, 'getLead')) {
-            $lead = $submission->getLead();
-            if ($lead instanceof Lead && !$lead->isAnonymous()) {
-                $aug = $this->contextBuilder->buildLeadAugmentation($lead);
-                $fromLeadProps = $aug['properties'] ?? [];
-                unset($aug['properties']);
-                $payload = array_merge($payload, $aug);
-                if ([] !== $fromLeadProps) {
-                    $payload['properties'] = array_merge($payload['properties'], $fromLeadProps);
-                }
-            }
-        }
-
-        $this->eventBuffer->push(FormEvents::FORM_ON_SUBMIT, $payload);
     }
 
     private function pushListChangeForLead(ListChangeEvent $event, Lead $lead): void

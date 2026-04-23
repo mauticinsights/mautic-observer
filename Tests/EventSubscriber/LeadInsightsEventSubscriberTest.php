@@ -4,10 +4,6 @@ declare(strict_types=1);
 
 namespace MauticPlugin\MauticInsightsBundle\Tests\EventSubscriber;
 
-use Mautic\FormBundle\Entity\Form;
-use Mautic\FormBundle\Entity\Submission;
-use Mautic\FormBundle\Event\SubmissionEvent;
-use Mautic\FormBundle\FormEvents;
 use Mautic\LeadBundle\Entity\Lead;
 use Mautic\LeadBundle\Entity\LeadList;
 use Mautic\LeadBundle\Entity\Tag;
@@ -124,7 +120,6 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         $this->assertArrayHasKey(LeadEvents::LEAD_IDENTIFIED, $map);
         $this->assertArrayHasKey(LeadEvents::CHANNEL_SUBSCRIPTION_CHANGED, $map);
         $this->assertSame(['onChannelSubscriptionChanged', 0], $map[LeadEvents::CHANNEL_SUBSCRIPTION_CHANGED]);
-        $this->assertArrayHasKey(FormEvents::FORM_ON_SUBMIT, $map);
 
         // LEAD_POINTS_CHANGE is intentionally NOT subscribed – not part of MVP (no scoring
         // metrics in funnel/realtime dashboards). See LeadInsightsEventSubscriber::getSubscribedEvents().
@@ -530,59 +525,6 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         );
 
         $this->assertSame([], $this->flushBufferAndGetNormalizedEventRows($buffer));
-    }
-
-    // ──────────────────────────────────────────────────────────────
-    // FORM_ON_SUBMIT  →  form submit
-    // ──────────────────────────────────────────────────────────────
-
-    public function testFormSubmitRequestBody(): void
-    {
-        [$buffer, , $subscriber] = $this->makeStack([['id' => 2]]);
-
-        $lead = new Lead();
-        $lead->stubId = 4;
-        $lead->stubEmail = 'form@example.com';
-        $lead->stubFirstname = 'Frank';
-
-        $submission = new Submission(new Form(55), $lead);
-        $subscriber->onFormSubmit(new SubmissionEvent($submission));
-
-        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
-
-        $this->assertSame([
-            [
-                'event' => FormEvents::FORM_ON_SUBMIT,
-                'channel' => 'form',
-                'properties' => [
-                    'form_id' => 55,
-                    'email' => 'form@example.com',
-                    'first_name' => 'Frank',
-                ],
-                'contact_id' => 4,
-                'segment_ids' => [2],
-            ],
-        ], $rows);
-    }
-
-    public function testFormSubmitWithoutLeadOmitsContactFields(): void
-    {
-        [$buffer, , $subscriber] = $this->makeStack();
-
-        $submission = new Submission(new Form(33), null);
-        $subscriber->onFormSubmit(new SubmissionEvent($submission));
-
-        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
-
-        $this->assertSame([
-            [
-                'event' => FormEvents::FORM_ON_SUBMIT,
-                'channel' => 'form',
-                'properties' => [
-                    'form_id' => 33,
-                ],
-            ],
-        ], $rows);
     }
 
     // ──────────────────────────────────────────────────────────────

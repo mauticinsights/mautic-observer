@@ -14,7 +14,8 @@ use DateTimeZone;
  * {@see \MauticPlugin\MauticInsightsBundle\EventSubscriber\EmailInsightsEventSubscriber} (opens, sends, display, reply, entity save/delete, queue fail/resend, transport webhook, point trigger mail),
  * {@see \MauticPlugin\MauticInsightsBundle\EventSubscriber\CampaignAnalyticsEventSubscriber} (campaign save/delete),
  * {@see \MauticPlugin\MauticInsightsBundle\EventSubscriber\SegmentInsightsEventSubscriber} (segment save/delete),
- * {@see \MauticPlugin\MauticInsightsBundle\EventSubscriber\PageInsightsEventSubscriber} (page hit) enqueue here;
+ * {@see \MauticPlugin\MauticInsightsBundle\EventSubscriber\PageInsightsEventSubscriber} (page hit),
+ * {@see \MauticPlugin\MauticInsightsBundle\EventSubscriber\FormInsightsEventSubscriber} (form submit) enqueue here;
  * {@see \MauticPlugin\MauticInsightsBundle\EventSubscriber\EventBufferFlushSubscriber} drains this queue into the main buffer and calls
  * {@see MauticEventBuffer::flush()} on both {@see \Symfony\Component\HttpKernel\KernelEvents::RESPONSE}
  * and {@see \Symfony\Component\HttpKernel\KernelEvents::TERMINATE} (main request). The first flush with pending rows sends HTTP; behaviour is the
