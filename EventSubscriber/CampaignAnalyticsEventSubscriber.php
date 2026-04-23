@@ -14,6 +14,7 @@ use Mautic\CampaignBundle\Event\FailedEvent;
 use Mautic\CampaignBundle\Event\ScheduledEvent;
 use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
 use MauticPlugin\MauticInsightsBundle\Buffer\MauticEventBuffer;
+use MauticPlugin\MauticInsightsBundle\Service\InsightsOutboundTokenProvider;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
@@ -29,6 +30,7 @@ final class CampaignAnalyticsEventSubscriber implements EventSubscriberInterface
     public function __construct(
         private MauticEventBuffer $eventBuffer,
         private DeferredOutboundEventQueue $deferredCampaignOutboundQueue,
+        private InsightsOutboundTokenProvider $outboundTokenProvider,
     ) {
     }
 
@@ -47,6 +49,10 @@ final class CampaignAnalyticsEventSubscriber implements EventSubscriberInterface
 
     public function onCampaignPostSave(CampaignEvent $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $campaign = $event->getCampaign();
         $id = $this->resolvePositiveCampaignId($campaign);
         if (null === $id) {
@@ -65,6 +71,10 @@ final class CampaignAnalyticsEventSubscriber implements EventSubscriberInterface
 
     public function onCampaignPostDelete(CampaignEvent $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $campaign = $event->getCampaign();
         $id = $this->resolvePositiveCampaignId($campaign);
         if (null === $id) {
@@ -122,6 +132,10 @@ final class CampaignAnalyticsEventSubscriber implements EventSubscriberInterface
 
     public function onCampaignLeadChange(CampaignLeadChangeEvent $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $action = $event->getAction();
         if (null === $action || '' === $action) {
             return;
@@ -153,11 +167,19 @@ final class CampaignAnalyticsEventSubscriber implements EventSubscriberInterface
 
     public function onEventExecuted(ExecutedEvent $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $this->pushStepExecutedFromLog($event->getLog());
     }
 
     public function onEventExecutedBatch(ExecutedBatchEvent $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         foreach ($event->getExecuted() as $log) {
             $this->pushStepExecutedFromLog($log);
         }
@@ -165,11 +187,19 @@ final class CampaignAnalyticsEventSubscriber implements EventSubscriberInterface
 
     public function onEventFailed(FailedEvent $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $this->pushStepFailedFromLog($event->getLog());
     }
 
     public function onEventScheduled(ScheduledEvent $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $this->pushStepScheduledFromLog($event);
     }
 

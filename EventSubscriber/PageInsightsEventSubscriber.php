@@ -7,6 +7,7 @@ namespace MauticPlugin\MauticInsightsBundle\EventSubscriber;
 use Mautic\PageBundle\Event\PageHitEvent;
 use Mautic\PageBundle\PageEvents;
 use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
+use MauticPlugin\MauticInsightsBundle\Service\InsightsOutboundTokenProvider;
 use MauticPlugin\MauticInsightsBundle\Service\PageHitPayloadBuilder;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
@@ -22,6 +23,7 @@ final class PageInsightsEventSubscriber implements EventSubscriberInterface
     public function __construct(
         private DeferredOutboundEventQueue $deferredOutboundEventQueue,
         private PageHitPayloadBuilder $payloadBuilder,
+        private InsightsOutboundTokenProvider $outboundTokenProvider,
     ) {
     }
 
@@ -34,6 +36,10 @@ final class PageInsightsEventSubscriber implements EventSubscriberInterface
 
     public function onPageHit(PageHitEvent $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $this->deferredOutboundEventQueue->enqueue(
             PageEvents::PAGE_ON_HIT,
             $this->payloadBuilder->buildPayload($event),

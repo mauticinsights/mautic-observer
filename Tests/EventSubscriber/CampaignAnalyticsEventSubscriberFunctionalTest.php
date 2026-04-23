@@ -25,6 +25,7 @@ use MauticPlugin\MauticInsightsBundle\EventSubscriber\CampaignAnalyticsEventSubs
 use MauticPlugin\MauticInsightsBundle\EventSubscriber\EventBufferFlushSubscriber;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsHttpTokenResolver;
+use MauticPlugin\MauticInsightsBundle\Service\InsightsOutboundTokenProvider;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPublishedIntegrationFinder;
 use MauticPlugin\MauticInsightsBundle\Service\NoopInsightsApiSendGate;
 use MauticPlugin\MauticInsightsBundle\Service\ResilientEventSender;
@@ -63,7 +64,7 @@ final class CampaignAnalyticsEventSubscriberFunctionalTest extends TestCase
         $client = $this->createCapturingEventHttpClient();
         $buffer = $this->createMauticEventBufferForTests($client);
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue);
+        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue, $this->createActiveTestOutboundTokenProvider());
 
         $campaign = new Campaign(10, 'Newsletter Q1', true);
         $subscriber->onCampaignPostSave(new CampaignEvent($campaign, true));
@@ -116,7 +117,7 @@ final class CampaignAnalyticsEventSubscriberFunctionalTest extends TestCase
         $client = $this->createCapturingEventHttpClient();
         $buffer = $this->createMauticEventBufferForTests($client);
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue);
+        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue, $this->createActiveTestOutboundTokenProvider());
 
         $campaign = new Campaign(null, 'Gone campaign');
         $campaign->deletedId = 42;
@@ -150,10 +151,11 @@ final class CampaignAnalyticsEventSubscriberFunctionalTest extends TestCase
             InsightsApiConfig::HTTP_TOKEN_FIELD => 'test-token',
         ]);
         $finder = InsightsPublishedIntegrationFinder::createForTest($integration);
+        $tokenProvider = new InsightsOutboundTokenProvider($finder, new InsightsHttpTokenResolver(null), null);
         $sender = new ResilientEventSender($client, new NullLogger(), 1, 0);
         $queue = new DeferredOutboundEventQueue();
-        $buffer = new MauticEventBuffer($sender, $finder, new InsightsHttpTokenResolver(null), new DisabledPersistentEventBuffer(), new NoopInsightsApiSendGate(), 5000);
-        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue);
+        $buffer = new MauticEventBuffer($sender, $tokenProvider, new DisabledPersistentEventBuffer(), new NoopInsightsApiSendGate(), 5000);
+        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue, $tokenProvider);
 
         $c = new Campaign(5, 'Batch camp');
         $subscriber->onCampaignPostSave(new CampaignEvent($c, true));
@@ -204,7 +206,7 @@ final class CampaignAnalyticsEventSubscriberFunctionalTest extends TestCase
         $client = $this->createCapturingEventHttpClient();
         $buffer = $this->createMauticEventBufferForTests($client);
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue);
+        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue, $this->createActiveTestOutboundTokenProvider());
 
         $campaign = new Campaign(7, 'Drip');
 
@@ -248,7 +250,7 @@ final class CampaignAnalyticsEventSubscriberFunctionalTest extends TestCase
         $client = $this->createCapturingEventHttpClient();
         $buffer = $this->createMauticEventBufferForTests($client);
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue);
+        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue, $this->createActiveTestOutboundTokenProvider());
 
         $lead = new Lead();
         $lead->stubId = 1;
@@ -281,7 +283,7 @@ final class CampaignAnalyticsEventSubscriberFunctionalTest extends TestCase
         $client = $this->createCapturingEventHttpClient();
         $buffer = $this->createMauticEventBufferForTests($client);
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue);
+        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue, $this->createActiveTestOutboundTokenProvider());
 
         $lead = new Lead();
         $lead->stubId = 5;
@@ -319,7 +321,7 @@ final class CampaignAnalyticsEventSubscriberFunctionalTest extends TestCase
         $client = $this->createCapturingEventHttpClient();
         $buffer = $this->createMauticEventBufferForTests($client);
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue);
+        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue, $this->createActiveTestOutboundTokenProvider());
 
         $lead = new Lead();
         $lead->stubId = 3;

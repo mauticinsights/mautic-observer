@@ -24,6 +24,7 @@ use MauticPlugin\MauticInsightsBundle\EventSubscriber\EventBufferFlushSubscriber
 use MauticPlugin\MauticInsightsBundle\EventSubscriber\LeadInsightsEventSubscriber;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsHttpTokenResolver;
+use MauticPlugin\MauticInsightsBundle\Service\InsightsOutboundTokenProvider;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPublishedIntegrationFinder;
 use MauticPlugin\MauticInsightsBundle\Service\LeadInsightsContextBuilder;
 use MauticPlugin\MauticInsightsBundle\Service\NoopInsightsApiSendGate;
@@ -95,7 +96,12 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         $leadModel = new LeadModel();
         $leadModel->listRows = $listRows;
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new LeadInsightsEventSubscriber($buffer, new LeadInsightsContextBuilder($leadModel), $queue);
+        $subscriber = new LeadInsightsEventSubscriber(
+            $buffer,
+            new LeadInsightsContextBuilder($leadModel),
+            $queue,
+            $this->createActiveTestOutboundTokenProvider()
+        );
 
         return [$buffer, $queue, $subscriber];
     }
@@ -638,13 +644,19 @@ final class LeadInsightsEventSubscriberTest extends TestCase
             InsightsApiConfig::HTTP_TOKEN_FIELD => 'test-token',
         ]);
         $finder = InsightsPublishedIntegrationFinder::createForTest($integration);
+        $tokenProvider = new InsightsOutboundTokenProvider($finder, new InsightsHttpTokenResolver(null), null);
         $sender = new ResilientEventSender($client, new NullLogger(), 1, 0);
 
         $leadModel = new LeadModel();
         $leadModel->listRows = [];
         $queue = new DeferredOutboundEventQueue();
-        $buffer = new MauticEventBuffer($sender, $finder, new InsightsHttpTokenResolver(null), new DisabledPersistentEventBuffer(), new NoopInsightsApiSendGate(), 5000);
-        $subscriber = new LeadInsightsEventSubscriber($buffer, new LeadInsightsContextBuilder($leadModel), $queue);
+        $buffer = new MauticEventBuffer($sender, $tokenProvider, new DisabledPersistentEventBuffer(), new NoopInsightsApiSendGate(), 5000);
+        $subscriber = new LeadInsightsEventSubscriber(
+            $buffer,
+            new LeadInsightsContextBuilder($leadModel),
+            $queue,
+            $tokenProvider
+        );
 
         $leadA = new Lead();
         $leadA->stubId = 10;
@@ -711,10 +723,10 @@ final class LeadInsightsEventSubscriberTest extends TestCase
     }
 
     // ──────────────────────────────────────────────────────────────
-    // Token not yet available at push time → sent on flush
+    // Outbound disabled (unpublished integration) — no buffer, no HTTP
     // ──────────────────────────────────────────────────────────────
 
-    public function testEventSentOnFlushWhenTokenUnavailableAtPushTime(): void
+    public function testNothingBufferedOrSentWhenIntegrationUnpublished(): void
     {
         $captured = [];
         $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$captured): MockResponse {
@@ -723,22 +735,25 @@ final class LeadInsightsEventSubscriberTest extends TestCase
             return new MockResponse('{}', ['http_code' => 200]);
         });
 
-        // Integration starts unpublished → no token during push
         $integration = new Integration(false, [], InsightsApiConfig::NAME, [
             InsightsApiConfig::HTTP_TOKEN_FIELD => 'test-token',
         ]);
         $finder = InsightsPublishedIntegrationFinder::createForTest($integration);
+        $tokenProvider = new InsightsOutboundTokenProvider($finder, new InsightsHttpTokenResolver(null), null);
         $sender = new ResilientEventSender($client, new NullLogger(), 1, 0);
 
         $leadModel = new LeadModel();
         $leadModel->listRows = [['id' => 3]];
         $queue = new DeferredOutboundEventQueue();
-        $buffer = new MauticEventBuffer($sender, $finder, new InsightsHttpTokenResolver(null), new DisabledPersistentEventBuffer(), new NoopInsightsApiSendGate(), 5000);
-        $subscriber = new LeadInsightsEventSubscriber($buffer, new LeadInsightsContextBuilder($leadModel), $queue);
+        $buffer = new MauticEventBuffer($sender, $tokenProvider, new DisabledPersistentEventBuffer(), new NoopInsightsApiSendGate(), 5000);
+        $subscriber = new LeadInsightsEventSubscriber(
+            $buffer,
+            new LeadInsightsContextBuilder($leadModel),
+            $queue,
+            $tokenProvider
+        );
 
         $subscriber->onLeadSave(new LeadEvent($this->makeFullLead(), true));
-
-        // Integration becomes published before flush
         $integration->makePublished();
 
         $kernel = $this->createMock(HttpKernelInterface::class);
@@ -746,9 +761,6 @@ final class LeadInsightsEventSubscriberTest extends TestCase
             new ResponseEvent($kernel, Request::create('/'), HttpKernelInterface::MAIN_REQUEST, new Response())
         );
 
-        $this->assertCount(1, $captured, 'Event must be sent on flush even if token was unavailable at push time');
-        $this->assertArrayHasKey('events', $captured[0]);
-        $this->assertSame(42, $captured[0]['events'][0]['contact_id']);
-        $this->assertSame(LeadEvents::LEAD_POST_SAVE, $captured[0]['events'][0]['event']);
+        $this->assertSame([], $captured, 'Subscriber must not enqueue when outbound was inactive at event time, even if integration is published before flush');
     }
 }

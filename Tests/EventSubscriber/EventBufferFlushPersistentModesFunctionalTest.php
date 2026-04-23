@@ -12,6 +12,7 @@ use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
 use MauticPlugin\MauticInsightsBundle\Buffer\MauticEventBuffer;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsHttpTokenResolver;
+use MauticPlugin\MauticInsightsBundle\Service\InsightsOutboundTokenProvider;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPublishedIntegrationFinder;
 use MauticPlugin\MauticInsightsBundle\Service\NoopInsightsApiSendGate;
 use MauticPlugin\MauticInsightsBundle\Service\ResilientEventSender;
@@ -110,10 +111,10 @@ final class EventBufferFlushPersistentModesFunctionalTest extends TestCase
             'properties' => ['from' => 'persistent_store'],
         ];
 
+        $tokenProvider = new InsightsOutboundTokenProvider($finder, new InsightsHttpTokenResolver(null), null);
         $buffer = new MauticEventBuffer(
             $sender,
-            $finder,
-            new InsightsHttpTokenResolver(null),
+            $tokenProvider,
             new SeededBacklogPersistentBuffer([$backlogRow], true),
             new NoopInsightsApiSendGate(),
             5000,

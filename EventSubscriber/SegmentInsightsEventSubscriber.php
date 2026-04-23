@@ -8,6 +8,7 @@ use Mautic\LeadBundle\Event\LeadListEvent;
 use Mautic\LeadBundle\LeadEvents;
 use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
+use MauticPlugin\MauticInsightsBundle\Service\InsightsOutboundTokenProvider;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
@@ -21,6 +22,7 @@ final class SegmentInsightsEventSubscriber implements EventSubscriberInterface
 {
     public function __construct(
         private DeferredOutboundEventQueue $deferredOutboundEventQueue,
+        private InsightsOutboundTokenProvider $outboundTokenProvider,
     ) {
     }
 
@@ -34,6 +36,10 @@ final class SegmentInsightsEventSubscriber implements EventSubscriberInterface
 
     public function onListPostSave(LeadListEvent $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $list = $event->getList();
         $id = $this->resolvePositiveLeadListId($list);
         if (null === $id) {
@@ -63,6 +69,10 @@ final class SegmentInsightsEventSubscriber implements EventSubscriberInterface
 
     public function onListPostDelete(LeadListEvent $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $list = $event->getList();
         $id = $this->resolvePositiveLeadListId($list);
         if (null === $id) {

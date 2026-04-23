@@ -8,6 +8,7 @@ use Mautic\PluginBundle\Entity\Integration;
 use MauticPlugin\MauticInsightsBundle\Buffer\MauticEventBuffer;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsHttpTokenResolver;
+use MauticPlugin\MauticInsightsBundle\Service\InsightsOutboundTokenProvider;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPublishedIntegrationFinder;
 use MauticPlugin\MauticInsightsBundle\Service\NoopInsightsApiSendGate;
 use MauticPlugin\MauticInsightsBundle\Service\ResilientEventSender;
@@ -87,7 +88,8 @@ final class EventEndpointFunctionalTest extends TestCase
         ]);
         $finder = InsightsPublishedIntegrationFinder::createForTest($integration);
         $sender = new ResilientEventSender($client, new NullLogger(), 1, 0);
+        $tokenProvider = new InsightsOutboundTokenProvider($finder, new InsightsHttpTokenResolver(null), null);
 
-        return new MauticEventBuffer($sender, $finder, new InsightsHttpTokenResolver(null), new EnabledNopPersistentBuffer(), new NoopInsightsApiSendGate(), $flushSize);
+        return new MauticEventBuffer($sender, $tokenProvider, new EnabledNopPersistentBuffer(), new NoopInsightsApiSendGate(), $flushSize);
     }
 }

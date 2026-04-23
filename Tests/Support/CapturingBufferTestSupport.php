@@ -9,6 +9,7 @@ use MauticPlugin\MauticInsightsBundle\Buffer\DisabledPersistentEventBuffer;
 use MauticPlugin\MauticInsightsBundle\Buffer\MauticEventBuffer;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsHttpTokenResolver;
+use MauticPlugin\MauticInsightsBundle\Service\InsightsOutboundTokenProvider;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPublishedIntegrationFinder;
 use MauticPlugin\MauticInsightsBundle\Service\NoopInsightsApiSendGate;
 use MauticPlugin\MauticInsightsBundle\Service\ResilientEventSender;
@@ -53,9 +54,8 @@ trait CapturingBufferTestSupport
         $integration = new Integration(true, [], InsightsApiConfig::NAME, [
             InsightsApiConfig::HTTP_TOKEN_FIELD => 'test-token',
         ]);
-        $finder = InsightsPublishedIntegrationFinder::createForTest($integration);
         $sender = new ResilientEventSender($client, new NullLogger(), 1, 0);
-        $tokenResolver = new InsightsHttpTokenResolver(null);
+        $tokenProvider = $this->createInsightsOutboundTokenProviderForTestIntegration($integration);
 
         $persistent = $usePersistentBuffer
             ? new EnabledNopPersistentBuffer()
@@ -63,14 +63,36 @@ trait CapturingBufferTestSupport
 
         return new MauticEventBuffer(
             $sender,
-            $finder,
-            $tokenResolver,
+            $tokenProvider,
             $persistent,
             new NoopInsightsApiSendGate(),
             $flushSize,
             InsightsApiConfig::EVENT_NOTIFY_URL,
             'events',
         );
+    }
+
+    /**
+     * Factory for the same object wiring used by {@see createMauticEventBufferForTests}
+     * so event subscribers and buffer share a consistent {@see Integration} (optional).
+     */
+    protected function createInsightsOutboundTokenProviderForTestIntegration(Integration $integration): InsightsOutboundTokenProvider
+    {
+        $finder = InsightsPublishedIntegrationFinder::createForTest($integration);
+
+        return new InsightsOutboundTokenProvider($finder, new InsightsHttpTokenResolver(null), null);
+    }
+
+    /**
+     * Published integration + non-empty test API key; matches {@see createMauticEventBufferForTests} defaults.
+     */
+    protected function createActiveTestOutboundTokenProvider(): InsightsOutboundTokenProvider
+    {
+        $integration = new Integration(true, [], InsightsApiConfig::NAME, [
+            InsightsApiConfig::HTTP_TOKEN_FIELD => 'test-token',
+        ]);
+
+        return $this->createInsightsOutboundTokenProviderForTestIntegration($integration);
     }
 
     private function newMainRequestTerminateEvent(): TerminateEvent

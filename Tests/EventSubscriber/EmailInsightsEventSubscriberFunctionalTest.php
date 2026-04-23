@@ -27,6 +27,7 @@ use MauticPlugin\MauticInsightsBundle\EventSubscriber\EventBufferFlushSubscriber
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
 use MauticPlugin\MauticInsightsBundle\Service\EmailInsightsContextBuilder;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsHttpTokenResolver;
+use MauticPlugin\MauticInsightsBundle\Service\InsightsOutboundTokenProvider;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPublishedIntegrationFinder;
 use MauticPlugin\MauticInsightsBundle\Service\LeadInsightsContextBuilder;
 use MauticPlugin\MauticInsightsBundle\Service\NoopInsightsApiSendGate;
@@ -74,7 +75,7 @@ final class EmailInsightsEventSubscriberFunctionalTest extends TestCase
         $leadModel = new LeadModel();
         $emailBuilder = new EmailInsightsContextBuilder(new LeadInsightsContextBuilder($leadModel));
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder);
+        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder, $this->createActiveTestOutboundTokenProvider());
 
         $created = new Email(1, 'Welcome', 'Hello', 'list', false);
         $subscriber->onEmailPostSave(new EmailEvent($created, true));
@@ -119,7 +120,7 @@ final class EmailInsightsEventSubscriberFunctionalTest extends TestCase
         $leadModel = new LeadModel();
         $emailBuilder = new EmailInsightsContextBuilder(new LeadInsightsContextBuilder($leadModel));
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder);
+        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder, $this->createActiveTestOutboundTokenProvider());
 
         $email = new Email(3, 'No subject yet', '', 'template', true);
         $subscriber->onEmailPostSave(new EmailEvent($email, true));
@@ -148,7 +149,7 @@ final class EmailInsightsEventSubscriberFunctionalTest extends TestCase
         $leadModel = new LeadModel();
         $emailBuilder = new EmailInsightsContextBuilder(new LeadInsightsContextBuilder($leadModel));
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder);
+        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder, $this->createActiveTestOutboundTokenProvider());
 
         $email = new Email(10, 'List mail', 'Hi', 'list', true);
         $email->lists = [
@@ -172,7 +173,7 @@ final class EmailInsightsEventSubscriberFunctionalTest extends TestCase
 
         $emailBuilder = new EmailInsightsContextBuilder(new LeadInsightsContextBuilder($leadModel));
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder);
+        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder, $this->createActiveTestOutboundTokenProvider());
 
         $lead = $this->makeLead(42, 'open@example.com');
         $list = new LeadList(99);
@@ -232,7 +233,7 @@ final class EmailInsightsEventSubscriberFunctionalTest extends TestCase
 
         $emailBuilder = new EmailInsightsContextBuilder(new LeadInsightsContextBuilder($leadModel));
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder);
+        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder, $this->createActiveTestOutboundTokenProvider());
 
         $internal = new EmailSendEvent();
         $internal->internalSend = true;
@@ -298,7 +299,7 @@ final class EmailInsightsEventSubscriberFunctionalTest extends TestCase
 
         $emailBuilder = new EmailInsightsContextBuilder(new LeadInsightsContextBuilder($leadModel));
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder);
+        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder, $this->createActiveTestOutboundTokenProvider());
 
         $display = new EmailSendEvent();
         $display->internalSend = false;
@@ -335,7 +336,7 @@ final class EmailInsightsEventSubscriberFunctionalTest extends TestCase
         $leadModel = new LeadModel();
         $emailBuilder = new EmailInsightsContextBuilder(new LeadInsightsContextBuilder($leadModel));
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder);
+        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder, $this->createActiveTestOutboundTokenProvider());
 
         $subscriber->onEmailPostDelete(new EmailEvent(new Email(10, 'Old template', 'Subj'), false));
         $queue->flushTo($buffer);
@@ -364,7 +365,7 @@ final class EmailInsightsEventSubscriberFunctionalTest extends TestCase
         $leadModel = new LeadModel();
         $emailBuilder = new EmailInsightsContextBuilder(new LeadInsightsContextBuilder($leadModel));
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder);
+        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder, $this->createActiveTestOutboundTokenProvider());
 
         $email = new Email(null, 'Gone', 'x');
         $email->deletedId = 42;
@@ -399,15 +400,16 @@ final class EmailInsightsEventSubscriberFunctionalTest extends TestCase
             InsightsApiConfig::HTTP_TOKEN_FIELD => 'test-token',
         ]);
         $finder = InsightsPublishedIntegrationFinder::createForTest($integration);
+        $tokenProvider = new InsightsOutboundTokenProvider($finder, new InsightsHttpTokenResolver(null), null);
         $sender = new ResilientEventSender($client, new NullLogger(), 1, 0);
 
         $leadModel = new LeadModel();
         $leadModel->listRows = [['id' => 10]];
         $queue = new DeferredOutboundEventQueue();
-        $buffer = new MauticEventBuffer($sender, $finder, new InsightsHttpTokenResolver(null), new DisabledPersistentEventBuffer(), new NoopInsightsApiSendGate(), 5000);
+        $buffer = new MauticEventBuffer($sender, $tokenProvider, new DisabledPersistentEventBuffer(), new NoopInsightsApiSendGate(), 5000);
 
         $emailBuilder = new EmailInsightsContextBuilder(new LeadInsightsContextBuilder($leadModel));
-        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder);
+        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder, $tokenProvider);
 
         $lead = $this->makeLead(77, 'batch@example.com');
         $stat = new Stat(
@@ -484,7 +486,7 @@ final class EmailInsightsEventSubscriberFunctionalTest extends TestCase
         $leadModel->listRows = [['id' => 1]];
         $emailBuilder = new EmailInsightsContextBuilder(new LeadInsightsContextBuilder($leadModel));
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder);
+        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder, $this->createActiveTestOutboundTokenProvider());
 
         $lead = $this->makeLead(5, 'r@example.com');
         $stat = new Stat(
@@ -511,7 +513,7 @@ final class EmailInsightsEventSubscriberFunctionalTest extends TestCase
         $leadModel = new LeadModel();
         $emailBuilder = new EmailInsightsContextBuilder(new LeadInsightsContextBuilder($leadModel));
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder);
+        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder, $this->createActiveTestOutboundTokenProvider());
 
         $from = new class {
             public function getAddress(): string
@@ -561,7 +563,7 @@ final class EmailInsightsEventSubscriberFunctionalTest extends TestCase
         $leadModel->listRows = [];
         $emailBuilder = new EmailInsightsContextBuilder(new LeadInsightsContextBuilder($leadModel));
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder);
+        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder, $this->createActiveTestOutboundTokenProvider());
 
         $lead = $this->makeLead(88, 'user@example.com');
         $trigger = new PointTriggerEvent(12, 'Notify user', 'email.send');
@@ -588,7 +590,7 @@ final class EmailInsightsEventSubscriberFunctionalTest extends TestCase
         $leadModel = new LeadModel();
         $emailBuilder = new EmailInsightsContextBuilder(new LeadInsightsContextBuilder($leadModel));
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder);
+        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder, $this->createActiveTestOutboundTokenProvider());
 
         $lead = new Lead();
         $lead->stubId = null;
@@ -607,7 +609,7 @@ final class EmailInsightsEventSubscriberFunctionalTest extends TestCase
         $leadModel = new LeadModel();
         $emailBuilder = new EmailInsightsContextBuilder(new LeadInsightsContextBuilder($leadModel));
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder);
+        $subscriber = new EmailInsightsEventSubscriber($queue, $emailBuilder, $this->createActiveTestOutboundTokenProvider());
 
         $req = Request::create('/webhooks/mailgun', 'POST', ['foo' => 'bar']);
         $subscriber->onTransportWebhook(new TransportWebhookEvent($req));

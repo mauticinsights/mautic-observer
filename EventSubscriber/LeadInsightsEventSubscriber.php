@@ -13,6 +13,7 @@ use Mautic\LeadBundle\Event\ListChangeEvent;
 use Mautic\LeadBundle\LeadEvents;
 use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
 use MauticPlugin\MauticInsightsBundle\Buffer\MauticEventBuffer;
+use MauticPlugin\MauticInsightsBundle\Service\InsightsOutboundTokenProvider;
 use MauticPlugin\MauticInsightsBundle\Service\LeadInsightsContextBuilder;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
@@ -25,6 +26,7 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
         private MauticEventBuffer $eventBuffer,
         private LeadInsightsContextBuilder $contextBuilder,
         private DeferredOutboundEventQueue $deferredLeadOutboundQueue,
+        private InsightsOutboundTokenProvider $outboundTokenProvider,
     ) {
     }
 
@@ -50,6 +52,10 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
 
     public function onLeadSave(LeadEvent $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $lead = $event->getLead();
         if ($lead->isAnonymous()) {
             return;
@@ -71,6 +77,10 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
 
     public function onLeadDelete(LeadEvent $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $lead = $event->getLead();
         if ($lead->isAnonymous()) {
             return;
@@ -111,6 +121,10 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
      */
     public function onListChange(ListChangeEvent $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $batch = $event->getLeads();
         if (\is_array($batch) && [] !== $batch) {
             foreach ($batch as $lead) {
@@ -130,6 +144,10 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
 
     public function onLeadIdentified(LeadEvent $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $lead = $event->getLead();
         if ($lead->isAnonymous()) {
             return;
@@ -162,6 +180,10 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
      */
     public function onChannelSubscriptionChanged(ChannelSubscriptionChange $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $lead = $event->getLead();
         if ($lead->isAnonymous()) {
             return;
@@ -183,6 +205,10 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
 
     public function onFormSubmit(SubmissionEvent $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $submission = $event->getSubmission();
         $payload = [
             'channel' => 'form',

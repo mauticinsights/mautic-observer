@@ -36,7 +36,7 @@ final class SegmentInsightsEventSubscriberFunctionalTest extends TestCase
         $client = $this->createCapturingEventHttpClient();
         $buffer = $this->createMauticEventBufferForTests($client);
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new SegmentInsightsEventSubscriber($queue);
+        $subscriber = new SegmentInsightsEventSubscriber($queue, $this->createActiveTestOutboundTokenProvider());
 
         $list = new LeadList(10, 'VIP', 'vip', 'VIP segment');
         $subscriber->onListPostSave(new LeadListEvent($list, true));
@@ -64,7 +64,7 @@ final class SegmentInsightsEventSubscriberFunctionalTest extends TestCase
         $client = $this->createCapturingEventHttpClient();
         $buffer = $this->createMauticEventBufferForTests($client);
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new SegmentInsightsEventSubscriber($queue);
+        $subscriber = new SegmentInsightsEventSubscriber($queue, $this->createActiveTestOutboundTokenProvider());
 
         $list = new LeadList(10, 'VIP Gold', 'vip', 'VIP segment', false);
         $subscriber->onListPostSave(new LeadListEvent($list, false));
@@ -92,7 +92,7 @@ final class SegmentInsightsEventSubscriberFunctionalTest extends TestCase
         $client = $this->createCapturingEventHttpClient();
         $buffer = $this->createMauticEventBufferForTests($client);
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new SegmentInsightsEventSubscriber($queue);
+        $subscriber = new SegmentInsightsEventSubscriber($queue, $this->createActiveTestOutboundTokenProvider());
 
         $list = new LeadList(5, 'Internal', 'internal', null);
         $subscriber->onListPostSave(new LeadListEvent($list, true));
@@ -119,7 +119,7 @@ final class SegmentInsightsEventSubscriberFunctionalTest extends TestCase
         $client = $this->createCapturingEventHttpClient();
         $buffer = $this->createMauticEventBufferForTests($client);
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new SegmentInsightsEventSubscriber($queue);
+        $subscriber = new SegmentInsightsEventSubscriber($queue, $this->createActiveTestOutboundTokenProvider());
 
         $list = new LeadList(10, 'VIP Gold', 'vip', null);
         $subscriber->onListPostDelete(new LeadListEvent($list, false));
@@ -147,7 +147,7 @@ final class SegmentInsightsEventSubscriberFunctionalTest extends TestCase
         $client = $this->createCapturingEventHttpClient();
         $buffer = $this->createMauticEventBufferForTests($client);
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new SegmentInsightsEventSubscriber($queue);
+        $subscriber = new SegmentInsightsEventSubscriber($queue, $this->createActiveTestOutboundTokenProvider());
 
         $list = new LeadList(null, 'Gone', 'gone', null);
         $list->deletedId = 42;
@@ -165,7 +165,7 @@ final class SegmentInsightsEventSubscriberFunctionalTest extends TestCase
         $client = $this->createCapturingEventHttpClient();
         $buffer = $this->createMauticEventBufferForTests($client);
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new SegmentInsightsEventSubscriber($queue);
+        $subscriber = new SegmentInsightsEventSubscriber($queue, $this->createActiveTestOutboundTokenProvider());
 
         $list = new LeadList(7, 'News', 'news', null);
         $subscriber->onListPostSave(new LeadListEvent($list, true));
@@ -183,7 +183,7 @@ final class SegmentInsightsEventSubscriberFunctionalTest extends TestCase
         $client = $this->createCapturingEventHttpClient();
         $buffer = $this->createMauticEventBufferForTests($client);
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new SegmentInsightsEventSubscriber($queue);
+        $subscriber = new SegmentInsightsEventSubscriber($queue, $this->createActiveTestOutboundTokenProvider());
 
         $listSave = new LeadList(1, 'Active', 'active', null);
         $listDel = new LeadList(2, 'Gone', 'gone', null);

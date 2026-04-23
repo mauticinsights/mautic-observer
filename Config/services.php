@@ -15,11 +15,10 @@ use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
 use MauticPlugin\MauticInsightsBundle\Integration\MauticInsightsIntegration;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsApiOutageCoordinator;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsApiSendGate;
-use MauticPlugin\MauticInsightsBundle\Service\InsightsHttpTokenResolver;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsLastApiTelemetry;
+use MauticPlugin\MauticInsightsBundle\Service\InsightsOutboundTokenProvider;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPluginLogger;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPluginLoggingFeatureReader;
-use MauticPlugin\MauticInsightsBundle\Service\InsightsPublishedIntegrationFinder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
@@ -66,9 +65,11 @@ return function (ContainerConfigurator $configurator): void {
 
     $services->set(DisabledPersistentEventBuffer::class);
 
+    $services->set(InsightsOutboundTokenProvider::class)
+        ->arg('$logger', service(InsightsPluginLogger::class));
+
     $services->set(MauticEventBuffer::class)
-        ->arg('$integrationFinder', service(InsightsPublishedIntegrationFinder::class))
-        ->arg('$httpTokenResolver', service(InsightsHttpTokenResolver::class))
+        ->arg('$outboundTokenProvider', service(InsightsOutboundTokenProvider::class))
         ->arg('$persistentBuffer', service(ConfigurablePersistentEventBuffer::class))
         ->arg('$sendGate', service(InsightsApiSendGate::class))
         ->arg('$flushSize', 50)

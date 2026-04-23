@@ -9,6 +9,7 @@ use MauticPlugin\MauticInsightsBundle\Buffer\DisabledPersistentEventBuffer;
 use MauticPlugin\MauticInsightsBundle\Buffer\MauticEventBuffer;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsHttpTokenResolver;
+use MauticPlugin\MauticInsightsBundle\Service\InsightsOutboundTokenProvider;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPublishedIntegrationFinder;
 use MauticPlugin\MauticInsightsBundle\Service\NoopInsightsApiSendGate;
 use MauticPlugin\MauticInsightsBundle\Service\ResilientEventSender;
@@ -123,10 +124,11 @@ final class MauticEventBufferSortTest extends TestCase
         $finder = InsightsPublishedIntegrationFinder::createForTest($integration);
         $sender = new ResilientEventSender($client, new NullLogger(), 1, 0);
 
+        $tokenProvider = new InsightsOutboundTokenProvider($finder, new InsightsHttpTokenResolver(null), null);
+
         return new MauticEventBuffer(
             $sender,
-            $finder,
-            new InsightsHttpTokenResolver(null),
+            $tokenProvider,
             new DisabledPersistentEventBuffer(),
             new NoopInsightsApiSendGate(),
             5000

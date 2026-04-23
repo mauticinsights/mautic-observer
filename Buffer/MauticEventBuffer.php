@@ -8,8 +8,7 @@ use DateTimeImmutable;
 use DateTimeZone;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsApiSendGate;
-use MauticPlugin\MauticInsightsBundle\Service\InsightsHttpTokenResolver;
-use MauticPlugin\MauticInsightsBundle\Service\InsightsPublishedIntegrationFinder;
+use MauticPlugin\MauticInsightsBundle\Service\InsightsOutboundTokenProvider;
 use MauticPlugin\MauticInsightsBundle\Service\ResilientEventSender;
 use Psr\Log\LoggerInterface;
 use Throwable;
@@ -18,6 +17,10 @@ use Throwable;
  * In-memory buffer with optional persistence. Flush sends POST to `$notifyUrl` with body `{ $requestPayloadRootKey: [ ... ] }` (defaults: {@see InsightsApiConfig::EVENT_NOTIFY_URL} + key `events`).
  *
  * If another process holds the lock, {@see PersistentEventBufferInterface::loadAndLock()} returns an empty backlog and only events from the current request are sent.
+ *
+ * When the integration is not published (or the API key is empty), {@see flush()} clears the durable buffer and
+ * does not write new rows; {@see push()} is a no-op. Subscribers are expected to return early in that state so
+ * payloads are not built.
  *
  * All events accumulate in memory; {@see flush()} (called by {@see \MauticPlugin\MauticInsightsBundle\EventSubscriber\EventBufferFlushSubscriber} on kernel response/terminate) sends them in one batch.
  * When {@see PersistentEventBufferInterface::isEnabled()} is true, the persistent buffer is used for durability; when false, events are held in memory until flush and dropped on failure.
@@ -37,8 +40,7 @@ final class MauticEventBuffer
 
     public function __construct(
         private ResilientEventSender $resilientEventSender,
-        private InsightsPublishedIntegrationFinder $integrationFinder,
-        private InsightsHttpTokenResolver $httpTokenResolver,
+        private InsightsOutboundTokenProvider $outboundTokenProvider,
         private PersistentEventBufferInterface $persistentBuffer,
         private InsightsApiSendGate $sendGate,
         private int $flushSize = 50,
@@ -54,6 +56,10 @@ final class MauticEventBuffer
      */
     public function push(string $event, array $data = []): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $row = \array_merge(
             [
                 'event' => $event,
@@ -74,18 +80,21 @@ final class MauticEventBuffer
         $memory = $this->buffer;
         $this->buffer = [];
 
-        if ([] === $memory) {
+        $token = $this->outboundTokenProvider->getToken();
+        if (null === $token) {
+            $this->persistentBuffer->clear();
+            if ([] === $memory) {
+                return;
+            }
+            $this->logger?->debug('MauticInsights: outbound inactive — in-memory events discarded, durable store cleared.', [
+                'count' => \count($memory),
+                'url' => $this->notifyUrl,
+            ]);
+
             return;
         }
 
-        $token = $this->getNotifyToken();
-        if (null === $token) {
-            if ($this->persistentBuffer->isEnabled()) {
-                $this->persistentBuffer->append($memory);
-            } else {
-                $this->logger?->critical('MauticInsights: events dropped — no token (integration not published or API key missing). Durable buffer is off.', ['count' => \count($memory), 'url' => $this->notifyUrl]);
-            }
-
+        if ([] === $memory) {
             return;
         }
 
@@ -152,26 +161,6 @@ final class MauticEventBuffer
         }
 
         return $failed;
-    }
-
-    private function getNotifyToken(): ?string
-    {
-        $integration = $this->integrationFinder->findPublished();
-        if (null === $integration) {
-            $this->logger?->debug('MauticInsights: integration not found or not published — no token.', ['url' => $this->notifyUrl]);
-
-            return null;
-        }
-
-        $token = $this->httpTokenResolver->resolve($integration);
-
-        if ('' === $token) {
-            $this->logger?->warning('MauticInsights: integration is published but API key (http_token) is empty.', ['url' => $this->notifyUrl]);
-
-            return null;
-        }
-
-        return $token;
     }
 
     private function formatTimestamp(): string

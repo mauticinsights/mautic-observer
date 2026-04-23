@@ -44,6 +44,7 @@ final class PageInsightsEventSubscriberFunctionalTest extends TestCase
         $subscriber = new PageInsightsEventSubscriber(
             $queue,
             new PageHitPayloadBuilder(new LeadInsightsContextBuilder($leadModel)),
+            $this->createActiveTestOutboundTokenProvider(),
         );
 
         return [$buffer, $queue, $subscriber];

@@ -13,6 +13,7 @@ use Mautic\EmailBundle\Event\TransportWebhookEvent;
 use Mautic\PointBundle\Event\TriggerExecutedEvent;
 use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
 use MauticPlugin\MauticInsightsBundle\Service\EmailInsightsContextBuilder;
+use MauticPlugin\MauticInsightsBundle\Service\InsightsOutboundTokenProvider;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
@@ -24,6 +25,7 @@ final class EmailInsightsEventSubscriber implements EventSubscriberInterface
     public function __construct(
         private DeferredOutboundEventQueue $deferredOutboundEventQueue,
         private EmailInsightsContextBuilder $emailContextBuilder,
+        private InsightsOutboundTokenProvider $outboundTokenProvider,
     ) {
     }
 
@@ -45,6 +47,10 @@ final class EmailInsightsEventSubscriber implements EventSubscriberInterface
 
     public function onEmailOpen(EmailOpenEvent $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $this->deferredOutboundEventQueue->enqueue(
             EmailEvents::EMAIL_ON_OPEN,
             $this->emailContextBuilder->buildEmailOpenPayload($event)
@@ -53,6 +59,10 @@ final class EmailInsightsEventSubscriber implements EventSubscriberInterface
 
     public function onEmailSend(EmailSendEvent $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $payload = $this->emailContextBuilder->buildEmailSendPayload($event);
         if (null !== $payload) {
             $this->deferredOutboundEventQueue->enqueue(EmailEvents::EMAIL_ON_SEND, $payload);
@@ -64,6 +74,10 @@ final class EmailInsightsEventSubscriber implements EventSubscriberInterface
      */
     public function onEmailDisplay(EmailSendEvent $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $payload = $this->emailContextBuilder->buildEmailSendPayload($event);
         if (null !== $payload) {
             $this->deferredOutboundEventQueue->enqueue(EmailEvents::EMAIL_ON_DISPLAY, $payload);
@@ -75,6 +89,10 @@ final class EmailInsightsEventSubscriber implements EventSubscriberInterface
      */
     public function onEmailReply(EmailOpenEvent $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $this->deferredOutboundEventQueue->enqueue(
             EmailEvents::EMAIL_ON_REPLY,
             $this->emailContextBuilder->buildEmailOpenPayload($event)
@@ -83,6 +101,10 @@ final class EmailInsightsEventSubscriber implements EventSubscriberInterface
 
     public function onEmailFailed(QueueEmailEvent $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $this->deferredOutboundEventQueue->enqueue(
             EmailEvents::EMAIL_FAILED,
             $this->emailContextBuilder->buildQueueEmailPayload($event)
@@ -91,6 +113,10 @@ final class EmailInsightsEventSubscriber implements EventSubscriberInterface
 
     public function onEmailResend(QueueEmailEvent $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $this->deferredOutboundEventQueue->enqueue(
             EmailEvents::EMAIL_RESEND,
             $this->emailContextBuilder->buildQueueEmailPayload($event)
@@ -99,6 +125,10 @@ final class EmailInsightsEventSubscriber implements EventSubscriberInterface
 
     public function onSentEmailToUser(TriggerExecutedEvent $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $payload = $this->emailContextBuilder->buildSentEmailToUserPayload($event);
         if (null !== $payload) {
             $this->deferredOutboundEventQueue->enqueue(EmailEvents::ON_SENT_EMAIL_TO_USER, $payload);
@@ -107,6 +137,10 @@ final class EmailInsightsEventSubscriber implements EventSubscriberInterface
 
     public function onTransportWebhook(TransportWebhookEvent $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $this->deferredOutboundEventQueue->enqueue(
             EmailEvents::ON_TRANSPORT_WEBHOOK,
             $this->emailContextBuilder->buildTransportWebhookPayload($event)
@@ -118,6 +152,10 @@ final class EmailInsightsEventSubscriber implements EventSubscriberInterface
      */
     public function onEmailPostSave(EmailEvent $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $email = $event->getEmail();
         $id = $this->resolvePositiveEmailId($email);
         if (null === $id) {
@@ -155,6 +193,10 @@ final class EmailInsightsEventSubscriber implements EventSubscriberInterface
 
     public function onEmailPostDelete(EmailEvent $event): void
     {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
         $email = $event->getEmail();
         $id = $this->resolvePositiveEmailId($email);
         if (null === $id) {
