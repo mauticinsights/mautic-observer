@@ -12,6 +12,8 @@ final class Event
     public function __construct(
         public string $type = '',
         public string $name = '',
+        public ?int $id = null,
+        public string $eventType = '',
     ) {
     }
 
@@ -23,5 +25,15 @@ final class Event
     public function getName(): string
     {
         return $this->name;
+    }
+
+    public function getId(): ?int
+    {
+        return $this->id;
+    }
+
+    public function getEventType(): string
+    {
+        return $this->eventType;
     }
 }

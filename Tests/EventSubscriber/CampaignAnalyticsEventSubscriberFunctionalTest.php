@@ -255,12 +255,12 @@ final class CampaignAnalyticsEventSubscriberFunctionalTest extends TestCase
         $lead = new Lead();
         $lead->stubId = 1;
         $camp = new Campaign(2, 'C');
-        $step = new CampaignEventEntity('email.send', 'Welcome mail');
+        $step = new CampaignEventEntity('email.send', 'Welcome mail', 1001, 'action');
 
-        $log1 = new LeadEventLog($lead, $camp, $step, null, null);
+        $log1 = new LeadEventLog($lead, $camp, $step, null, null, 8801);
         $subscriber->onEventExecuted(new ExecutedEvent($log1));
 
-        $log2 = new LeadEventLog($lead, $camp, $step, null, null);
+        $log2 = new LeadEventLog($lead, $camp, $step, null, null, 8802);
         $subscriber->onEventExecutedBatch(new ExecutedBatchEvent([$log2]));
 
         $expectedRow = [
@@ -271,11 +271,18 @@ final class CampaignAnalyticsEventSubscriberFunctionalTest extends TestCase
             'properties' => [
                 'step_type' => 'email.send',
                 'step_name' => 'Welcome mail',
+                'event_id' => 1001,
+                'event_type' => 'action',
+                'lead_event_log_id' => 8801,
+                'rotation' => 1,
             ],
         ];
 
+        $expectedRow2 = $expectedRow;
+        $expectedRow2['properties']['lead_event_log_id'] = 8802;
+
         $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
-        $this->assertSame([$expectedRow, $expectedRow], $rows);
+        $this->assertSame([$expectedRow, $expectedRow2], $rows);
     }
 
     public function testStepExecutedPayloadIncludesIsoTimestampFromDateTriggered(): void
@@ -288,10 +295,10 @@ final class CampaignAnalyticsEventSubscriberFunctionalTest extends TestCase
         $lead = new Lead();
         $lead->stubId = 5;
         $camp = new Campaign(9, 'C9');
-        $step = new CampaignEventEntity('action', 'A1');
+        $step = new CampaignEventEntity('action', 'A1', 201, 'condition');
         $when = new DateTimeImmutable('2020-06-01 14:30:00', new DateTimeZone('UTC'));
 
-        $log = new LeadEventLog($lead, $camp, $step, $when, null);
+        $log = new LeadEventLog($lead, $camp, $step, $when, null, 9901, 2);
         $subscriber->onEventExecuted(new ExecutedEvent($log));
         $buffer->flush();
 
@@ -310,6 +317,10 @@ final class CampaignAnalyticsEventSubscriberFunctionalTest extends TestCase
             'properties' => [
                 'step_type' => 'action',
                 'step_name' => 'A1',
+                'event_id' => 201,
+                'event_type' => 'condition',
+                'lead_event_log_id' => 9901,
+                'rotation' => 2,
             ],
         ];
 
@@ -326,13 +337,23 @@ final class CampaignAnalyticsEventSubscriberFunctionalTest extends TestCase
         $lead = new Lead();
         $lead->stubId = 3;
         $camp = new Campaign(4, 'C4');
-        $step = new CampaignEventEntity('email.send', 'Follow-up');
+        $step = new CampaignEventEntity('email.send', 'Follow-up', 4001, 'action');
 
-        $failLog = new LeadEventLog($lead, $camp, $step, null, null);
+        $failLog = new LeadEventLog(
+            $lead,
+            $camp,
+            $step,
+            null,
+            null,
+            7001,
+            1,
+            true,
+            ['error' => 'smtp_down'],
+        );
         $subscriber->onEventFailed(new FailedEvent($failLog));
 
         $scheduleWhen = new DateTimeImmutable('2030-12-24 08:00:00', new DateTimeZone('UTC'));
-        $schedLog = new LeadEventLog($lead, $camp, $step, null, $scheduleWhen);
+        $schedLog = new LeadEventLog($lead, $camp, $step, null, $scheduleWhen, 7002, 1, false, []);
         $subscriber->onEventScheduled(new ScheduledEvent($schedLog, true));
 
         $expectedFailed = [
@@ -343,6 +364,12 @@ final class CampaignAnalyticsEventSubscriberFunctionalTest extends TestCase
             'properties' => [
                 'step_type' => 'email.send',
                 'step_name' => 'Follow-up',
+                'event_id' => 4001,
+                'event_type' => 'action',
+                'lead_event_log_id' => 7001,
+                'rotation' => 1,
+                'non_action_path_taken' => true,
+                'metadata' => ['error' => 'smtp_down'],
             ],
         ];
 
@@ -355,6 +382,11 @@ final class CampaignAnalyticsEventSubscriberFunctionalTest extends TestCase
             'properties' => [
                 'step_type' => 'email.send',
                 'step_name' => 'Follow-up',
+                'event_id' => 4001,
+                'event_type' => 'action',
+                'lead_event_log_id' => 7002,
+                'rotation' => 1,
+                'non_action_path_taken' => false,
                 'is_reschedule' => true,
             ],
         ];

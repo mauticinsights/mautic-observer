@@ -235,10 +235,7 @@ final class CampaignAnalyticsEventSubscriber implements EventSubscriberInterface
             'channel' => 'campaign',
             'contact_id' => $leadId,
             'campaign_id' => $campaignId,
-            'properties' => [
-                'step_type' => $eventEntity->getType(),
-                'step_name' => $eventEntity->getName(),
-            ],
+            'properties' => $this->buildCampaignGraphStepProperties($log, $eventEntity),
         ];
 
         $triggered = $log->getDateTriggered();
@@ -268,10 +265,7 @@ final class CampaignAnalyticsEventSubscriber implements EventSubscriberInterface
             'channel' => 'campaign',
             'contact_id' => $leadId,
             'campaign_id' => $campaignId,
-            'properties' => [
-                'step_type' => $eventEntity->getType(),
-                'step_name' => $eventEntity->getName(),
-            ],
+            'properties' => $this->buildCampaignGraphStepProperties($log, $eventEntity),
         ];
 
         $triggered = $log->getDateTriggered();
@@ -298,15 +292,14 @@ final class CampaignAnalyticsEventSubscriber implements EventSubscriberInterface
             return;
         }
 
+        $properties = $this->buildCampaignGraphStepProperties($log, $eventEntity);
+        $properties['is_reschedule'] = $event->isReschedule();
+
         $data = [
             'channel' => 'campaign',
             'contact_id' => $leadId,
             'campaign_id' => $campaignId,
-            'properties' => [
-                'step_type' => $eventEntity->getType(),
-                'step_name' => $eventEntity->getName(),
-                'is_reschedule' => $event->isReschedule(),
-            ],
+            'properties' => $properties,
         ];
 
         $when = $log->getTriggerDate();
@@ -315,5 +308,77 @@ final class CampaignAnalyticsEventSubscriber implements EventSubscriberInterface
         }
 
         $this->eventBuffer->push('campaign.step_scheduled', $data);
+    }
+
+    /**
+     * Funnel context: Mautic {@code campaign_events.id}, log row id, rotation, decision path, metadata.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildCampaignGraphStepProperties(LeadEventLog $log, object $eventEntity): array
+    {
+        $properties = [
+            'step_type' => $eventEntity->getType(),
+            'step_name' => $eventEntity->getName(),
+        ];
+
+        $eventId = $this->positiveIntFromIdGetter($eventEntity);
+        if (null !== $eventId) {
+            $properties['event_id'] = $eventId;
+        }
+
+        if (method_exists($eventEntity, 'getEventType')) {
+            $eventType = $eventEntity->getEventType();
+            if (\is_string($eventType) && '' !== \trim($eventType)) {
+                $properties['event_type'] = $eventType;
+            }
+        }
+
+        $logId = $this->positiveIntFromIdGetter($log);
+        if (null !== $logId) {
+            $properties['lead_event_log_id'] = $logId;
+        }
+
+        if (method_exists($log, 'getRotation')) {
+            $rotation = $log->getRotation();
+            if (\is_int($rotation)) {
+                $properties['rotation'] = $rotation;
+            }
+        }
+
+        if (method_exists($log, 'getNonActionPathTaken')) {
+            $nonAction = $log->getNonActionPathTaken();
+            if (\is_bool($nonAction)) {
+                $properties['non_action_path_taken'] = $nonAction;
+            }
+        }
+
+        if (method_exists($log, 'getMetadata')) {
+            $metadata = $log->getMetadata();
+            if (\is_array($metadata) && [] !== $metadata) {
+                $properties['metadata'] = $metadata;
+            }
+        }
+
+        return $properties;
+    }
+
+    private function positiveIntFromIdGetter(object $entity): ?int
+    {
+        if (!method_exists($entity, 'getId')) {
+            return null;
+        }
+
+        $raw = $entity->getId();
+        if (\is_int($raw)) {
+            return $raw > 0 ? $raw : null;
+        }
+        if (\is_string($raw) && is_numeric($raw)) {
+            $n = (int) $raw;
+
+            return $n > 0 ? $n : null;
+        }
+
+        return null;
     }
 }
