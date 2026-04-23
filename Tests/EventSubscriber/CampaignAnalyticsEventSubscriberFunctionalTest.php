@@ -24,6 +24,7 @@ use MauticPlugin\MauticInsightsBundle\Buffer\MauticEventBuffer;
 use MauticPlugin\MauticInsightsBundle\EventSubscriber\CampaignAnalyticsEventSubscriber;
 use MauticPlugin\MauticInsightsBundle\EventSubscriber\EventBufferFlushSubscriber;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
+use MauticPlugin\MauticInsightsBundle\Service\CampaignGraphEventsSerializer;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsHttpTokenResolver;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsOutboundTokenProvider;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPublishedIntegrationFinder;
@@ -64,7 +65,7 @@ final class CampaignAnalyticsEventSubscriberFunctionalTest extends TestCase
         $client = $this->createCapturingEventHttpClient();
         $buffer = $this->createMauticEventBufferForTests($client);
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue, $this->createActiveTestOutboundTokenProvider());
+        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue, $this->createActiveTestOutboundTokenProvider(), new CampaignGraphEventsSerializer());
 
         $campaign = new Campaign(10, 'Newsletter Q1', true);
         $subscriber->onCampaignPostSave(new CampaignEvent($campaign, true));
@@ -84,6 +85,7 @@ final class CampaignAnalyticsEventSubscriberFunctionalTest extends TestCase
                 'name' => 'Newsletter Q1',
                 'operation' => 'created',
                 'is_published' => true,
+                'graph_events' => [],
             ],
         ];
 
@@ -94,6 +96,7 @@ final class CampaignAnalyticsEventSubscriberFunctionalTest extends TestCase
                 'name' => 'Newsletter Q1 rev2',
                 'operation' => 'updated',
                 'is_published' => false,
+                'graph_events' => [],
             ],
         ];
 
@@ -117,7 +120,7 @@ final class CampaignAnalyticsEventSubscriberFunctionalTest extends TestCase
         $client = $this->createCapturingEventHttpClient();
         $buffer = $this->createMauticEventBufferForTests($client);
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue, $this->createActiveTestOutboundTokenProvider());
+        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue, $this->createActiveTestOutboundTokenProvider(), new CampaignGraphEventsSerializer());
 
         $campaign = new Campaign(null, 'Gone campaign');
         $campaign->deletedId = 42;
@@ -155,7 +158,7 @@ final class CampaignAnalyticsEventSubscriberFunctionalTest extends TestCase
         $sender = new ResilientEventSender($client, new NullLogger(), 1, 0);
         $queue = new DeferredOutboundEventQueue();
         $buffer = new MauticEventBuffer($sender, $tokenProvider, new DisabledPersistentEventBuffer(), new NoopInsightsApiSendGate(), 5000);
-        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue, $tokenProvider);
+        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue, $tokenProvider, new CampaignGraphEventsSerializer());
 
         $c = new Campaign(5, 'Batch camp');
         $subscriber->onCampaignPostSave(new CampaignEvent($c, true));
@@ -187,6 +190,7 @@ final class CampaignAnalyticsEventSubscriberFunctionalTest extends TestCase
                 'name' => 'Batch camp',
                 'operation' => 'created',
                 'is_published' => true,
+                'graph_events' => [],
             ],
         ], $row0);
 
@@ -206,7 +210,7 @@ final class CampaignAnalyticsEventSubscriberFunctionalTest extends TestCase
         $client = $this->createCapturingEventHttpClient();
         $buffer = $this->createMauticEventBufferForTests($client);
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue, $this->createActiveTestOutboundTokenProvider());
+        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue, $this->createActiveTestOutboundTokenProvider(), new CampaignGraphEventsSerializer());
 
         $campaign = new Campaign(7, 'Drip');
 
@@ -250,7 +254,7 @@ final class CampaignAnalyticsEventSubscriberFunctionalTest extends TestCase
         $client = $this->createCapturingEventHttpClient();
         $buffer = $this->createMauticEventBufferForTests($client);
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue, $this->createActiveTestOutboundTokenProvider());
+        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue, $this->createActiveTestOutboundTokenProvider(), new CampaignGraphEventsSerializer());
 
         $lead = new Lead();
         $lead->stubId = 1;
@@ -290,7 +294,7 @@ final class CampaignAnalyticsEventSubscriberFunctionalTest extends TestCase
         $client = $this->createCapturingEventHttpClient();
         $buffer = $this->createMauticEventBufferForTests($client);
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue, $this->createActiveTestOutboundTokenProvider());
+        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue, $this->createActiveTestOutboundTokenProvider(), new CampaignGraphEventsSerializer());
 
         $lead = new Lead();
         $lead->stubId = 5;
@@ -332,7 +336,7 @@ final class CampaignAnalyticsEventSubscriberFunctionalTest extends TestCase
         $client = $this->createCapturingEventHttpClient();
         $buffer = $this->createMauticEventBufferForTests($client);
         $queue = new DeferredOutboundEventQueue();
-        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue, $this->createActiveTestOutboundTokenProvider());
+        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue, $this->createActiveTestOutboundTokenProvider(), new CampaignGraphEventsSerializer());
 
         $lead = new Lead();
         $lead->stubId = 3;
@@ -401,5 +405,34 @@ final class CampaignAnalyticsEventSubscriberFunctionalTest extends TestCase
         $this->assertSame($expectedFailed, $rowFailed);
 
         $this->assertSame($expectedScheduled, $decoded['events'][1]);
+    }
+
+    public function testCampaignPostSaveSerializesGraphEventsOrderedByStepOrder(): void
+    {
+        $client = $this->createCapturingEventHttpClient();
+        $buffer = $this->createMauticEventBufferForTests($client);
+        $queue = new DeferredOutboundEventQueue();
+        $subscriber = new CampaignAnalyticsEventSubscriber($buffer, $queue, $this->createActiveTestOutboundTokenProvider(), new CampaignGraphEventsSerializer());
+
+        $root = new CampaignEventEntity('decision', 'Opened email?', 10, 'decision', 0, 'Root desc', null, null, null, null, null, ['decision' => true]);
+        $child = new CampaignEventEntity('action', 'Send follow-up', 20, 'email.send', 1, '', $root, 'yes', 'email', 100, 'interval', ['email' => 5]);
+        $campaign = new Campaign(50, 'Drip', true, [$child, $root]);
+
+        $subscriber->onCampaignPostSave(new CampaignEvent($campaign, false));
+        $queue->flushTo($buffer);
+
+        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
+        $this->assertCount(1, $rows);
+        $this->assertSame(CampaignEvents::CAMPAIGN_POST_SAVE, $rows[0]['event']);
+        $graph = $rows[0]['properties']['graph_events'];
+        $this->assertCount(2, $graph);
+        $this->assertSame(10, $graph[0]['campaign_event_id']);
+        $this->assertSame(0, $graph[0]['step_order']);
+        $this->assertSame(20, $graph[1]['campaign_event_id']);
+        $this->assertSame(10, $graph[1]['parent_campaign_event_id']);
+        $this->assertSame('yes', $graph[1]['decision_path']);
+        $this->assertSame('email', $graph[1]['channel']);
+        $this->assertSame(100, $graph[1]['channel_id']);
+        $this->assertSame(['email' => 5], $graph[1]['properties']);
     }
 }

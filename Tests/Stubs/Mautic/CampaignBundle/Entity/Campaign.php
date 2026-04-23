@@ -12,11 +12,19 @@ final class Campaign
     /** Mirrors {@see \Mautic\CoreBundle\Entity\FormEntity::$deletedId} after {@see \Mautic\CoreBundle\Model\FormModel::deleteEntity()}. */
     public ?int $deletedId = null;
 
+    /** @var list<Event> */
+    private array $events;
+
+    /**
+     * @param list<Event> $events
+     */
     public function __construct(
         public ?int $id = null,
         public string $name = '',
         private bool $published = true,
+        array $events = [],
     ) {
+        $this->events = $events;
     }
 
     public function isPublished(): bool
@@ -37,5 +45,13 @@ final class Campaign
     public function getName(): string
     {
         return $this->name;
+    }
+
+    /**
+     * @return list<Event>
+     */
+    public function getEvents(): array
+    {
+        return $this->events;
     }
 }

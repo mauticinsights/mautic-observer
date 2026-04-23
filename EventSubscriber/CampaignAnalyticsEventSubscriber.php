@@ -14,6 +14,7 @@ use Mautic\CampaignBundle\Event\FailedEvent;
 use Mautic\CampaignBundle\Event\ScheduledEvent;
 use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
 use MauticPlugin\MauticInsightsBundle\Buffer\MauticEventBuffer;
+use MauticPlugin\MauticInsightsBundle\Service\CampaignGraphEventsSerializer;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsOutboundTokenProvider;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
@@ -31,6 +32,7 @@ final class CampaignAnalyticsEventSubscriber implements EventSubscriberInterface
         private MauticEventBuffer $eventBuffer,
         private DeferredOutboundEventQueue $deferredCampaignOutboundQueue,
         private InsightsOutboundTokenProvider $outboundTokenProvider,
+        private CampaignGraphEventsSerializer $campaignGraphEventsSerializer,
     ) {
     }
 
@@ -59,13 +61,17 @@ final class CampaignAnalyticsEventSubscriber implements EventSubscriberInterface
             return;
         }
 
+        $properties = [
+            'name' => $campaign->getName(),
+            'operation' => $event->isNew() ? 'created' : 'updated',
+            'is_published' => $campaign->isPublished(),
+        ];
+
+        $properties['graph_events'] = $this->campaignGraphEventsSerializer->serialize($campaign);
+
         $this->deferredCampaignOutboundQueue->enqueue(CampaignEvents::CAMPAIGN_POST_SAVE, [
             'campaign_id' => $id,
-            'properties' => [
-                'name' => $campaign->getName(),
-                'operation' => $event->isNew() ? 'created' : 'updated',
-                'is_published' => $campaign->isPublished(),
-            ],
+            'properties' => $properties,
         ]);
     }
 
