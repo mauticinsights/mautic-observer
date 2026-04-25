@@ -32,6 +32,8 @@ class Lead
 
     public ?string $stubLastname = null;
 
+    public ?string $stubPhone = null;
+
     /** @var iterable<object> */
     public iterable $stubTags = [];
 
@@ -92,6 +94,11 @@ class Lead
     public function getLastname(): ?string
     {
         return $this->stubLastname;
+    }
+
+    public function getPhone(): ?string
+    {
+        return $this->stubPhone;
     }
 
     /**

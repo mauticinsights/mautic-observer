@@ -158,6 +158,16 @@ final class LeadInsightsContextBuilder
             $out['last_name'] = $last;
         }
 
+        $phone = $lead->getPhone();
+        if (\is_string($phone)) {
+            $phone = trim($phone);
+        } else {
+            $phone = null;
+        }
+        if (null !== $phone && '' !== $phone) {
+            $out['phone'] = $phone;
+        }
+
         $tags = [];
         foreach ($lead->getTags() as $tag) {
             if (\is_object($tag) && method_exists($tag, 'getTag')) {
