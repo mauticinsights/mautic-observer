@@ -6,6 +6,8 @@ namespace MauticPlugin\MauticInsightsBundle\EventSubscriber;
 
 use Mautic\ConfigBundle\ConfigEvents;
 use Mautic\ConfigBundle\Event\ConfigEvent;
+use Mautic\CoreBundle\CoreEvents;
+use Mautic\CoreBundle\Event\MaintenanceEvent;
 use Mautic\CoreBundle\Helper\AppVersion;
 use Mautic\CoreBundle\Helper\CoreParametersHelper;
 use Mautic\IntegrationsBundle\Event\ConfigSaveEvent;
@@ -42,6 +44,9 @@ use Throwable;
  *
  * Note: Mautic only dispatches ON_PLUGIN_UPDATE when the version string in the plugin {@code config.php} changes;
  * a plain {@code mautic:plugins:reload} without a version bump does not fire that event — the reload command hook covers that.
+ *
+ * After {@code mautic:maintenance:cleanup} finishes purging (not {@code --dry-run}), queues the same POST
+ * {@see InsightsApiConfig::STATUS_NOTIFY_URL} so Mautic Insights receives fresh identified/anonymous counts.
  */
 class IntegrationConfigSubscriber implements EventSubscriberInterface
 {
@@ -79,9 +84,22 @@ class IntegrationConfigSubscriber implements EventSubscriberInterface
             PluginEvents::ON_PLUGIN_UPDATE => ['onPluginUpdate', 0],
             PluginEvents::ON_PLUGIN_INSTALL => ['onPluginInstall', 0],
             ConfigEvents::CONFIG_PRE_SAVE => ['onGlobalConfigPreSave', 0],
+            CoreEvents::MAINTENANCE_CLEANUP_DATA => ['onMaintenanceCleanup', -1000],
             KernelEvents::TERMINATE => ['onHttpTerminate', -1024],
             ConsoleEvents::TERMINATE => ['onConsoleTerminate', -1024],
         ];
+    }
+
+    /**
+     * Runs after Core/Page/Lead maintenance listeners (priority -1000) so lead counts reflect the purge.
+     */
+    public function onMaintenanceCleanup(MaintenanceEvent $event): void
+    {
+        if ($event->isDryRun()) {
+            return;
+        }
+
+        $this->queueStatusNotifyFromFinder();
     }
 
     public function queueStatusNotify(ConfigSaveEvent $event): void

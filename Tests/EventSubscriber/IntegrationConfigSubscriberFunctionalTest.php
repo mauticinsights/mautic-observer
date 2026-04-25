@@ -6,6 +6,8 @@ namespace MauticPlugin\MauticInsightsBundle\Tests\EventSubscriber;
 
 use Mautic\ConfigBundle\ConfigEvents;
 use Mautic\ConfigBundle\Event\ConfigEvent;
+use Mautic\CoreBundle\CoreEvents;
+use Mautic\CoreBundle\Event\MaintenanceEvent;
 use Mautic\CoreBundle\Helper\AppVersion;
 use Mautic\CoreBundle\Helper\CoreParametersHelper;
 use Mautic\CoreBundle\Helper\EncryptionHelper;
@@ -53,6 +55,67 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
         $this->assertArrayHasKey(\Symfony\Component\Console\ConsoleEvents::TERMINATE, $map);
         $this->assertArrayHasKey(PluginEvents::ON_PLUGIN_UPDATE, $map);
         $this->assertArrayHasKey(PluginEvents::ON_PLUGIN_INSTALL, $map);
+        $this->assertArrayHasKey(CoreEvents::MAINTENANCE_CLEANUP_DATA, $map);
+    }
+
+    public function testMaintenanceCleanupDryRunDoesNotQueueStatus(): void
+    {
+        $captured = [];
+        $subscriber = $this->makeSubscriber(
+            version: '5.2.0',
+            identifiedContacts: 10,
+            senderEmail: 'from@example.com',
+            token: 'maint-token',
+            captured: $captured,
+        );
+
+        $subscriber->onMaintenanceCleanup(new MaintenanceEvent(365, true, false));
+
+        $command = $this->createMock(Command::class);
+        $command->method('getName')->willReturn('mautic:maintenance:cleanup');
+        $command->method('getAliases')->willReturn([]);
+
+        $subscriber->onConsoleTerminate(new ConsoleTerminateEvent(
+            $command,
+            new ArrayInput([]),
+            new NullOutput(),
+            0
+        ));
+
+        $this->assertCount(0, $captured);
+    }
+
+    public function testMaintenanceCleanupAfterPurgeQueuesStatusSentOnConsoleTerminate(): void
+    {
+        $captured = [];
+        $subscriber = $this->makeSubscriber(
+            version: '5.2.0',
+            identifiedContacts: 8,
+            senderEmail: 'from@example.com',
+            token: 'maint-token',
+            captured: $captured,
+            anonymousContacts: 3,
+        );
+
+        $subscriber->onMaintenanceCleanup(new MaintenanceEvent(365, false, false));
+
+        $command = $this->createMock(Command::class);
+        $command->method('getName')->willReturn('mautic:maintenance:cleanup');
+        $command->method('getAliases')->willReturn([]);
+
+        $subscriber->onConsoleTerminate(new ConsoleTerminateEvent(
+            $command,
+            new ArrayInput([]),
+            new NullOutput(),
+            0
+        ));
+
+        $this->assertCount(1, $captured);
+        $this->assertSame('POST', $captured[0]['method']);
+        $body = json_decode($captured[0]['options']['body'] ?? '', true, 512, JSON_THROW_ON_ERROR);
+        $this->assertIsArray($body);
+        $this->assertSame(8, $body['identified-contacts']);
+        $this->assertSame(3, $body['anonymous-contacts']);
     }
 
     public function testSuccessfulPluginsReloadCommandSendsStatusOnConsoleTerminate(): void
