@@ -47,6 +47,8 @@ return function (ContainerConfigurator $configurator): void {
             'Service/InsightsPluginLogger.php',
             // $dataDir must be explicit; prototype load would overwrite an earlier ->set().
             'Service/InsightsApiOutageCoordinator.php',
+            // $dataDir must be explicit; also avoids accidental EntityManagerInterface injection.
+            'Service/SyncSessionManager.php',
         ]
     );
 
@@ -70,6 +72,7 @@ return function (ContainerConfigurator $configurator): void {
         ->arg('$logger', service(InsightsPluginLogger::class));
 
     $services->set(SyncSessionManager::class)
+        ->arg('$dataDir', '%kernel.project_dir%/var/mauticinsights-buffer')
         ->arg('$logger', service(InsightsPluginLogger::class));
 
     $services->set(MauticEventBuffer::class)

@@ -28,10 +28,7 @@ parameters:
         -
             identifier: missingType.parameter
             path: Service/InsightsPluginLogger.php
-        # setFeatureSettings() / getLocale() exist on real Mautic entities but are not picked up from bootstrapFiles stubs.
-        -
-            message: '#Call to an undefined method Mautic\\PluginBundle\\Entity\\Integration::setFeatureSettings\(\)#'
-            path: Service/SyncSessionManager.php
+        # getLocale() exists on real Mautic User entity but is not picked up from bootstrapFiles stubs.
         -
             message: '#Call to an undefined method Mautic\\UserBundle\\Entity\\User::getLocale\(\)#'
             path: Service/InsightsPluginHealthProvider.php
