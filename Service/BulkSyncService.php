@@ -12,16 +12,18 @@ use Psr\Log\LoggerInterface;
 
 /**
  * Fetches all Mautic entities (segments, emails, campaigns, contacts) in pages of 1 000 and
- * pushes them to the Insights API using the same payload format as live event subscribers.
+ * pushes them to the Insights API via the single POST /event endpoint — same pipeline as live events.
  *
  * Sync order is important:
- *   1. Segments   — referenced by contacts; must exist in the app before contacts arrive.
+ *   1. Segments   — must exist in the app before contacts arrive.
  *   2. Emails     — referenced by campaign graph nodes.
- *   3. Campaigns  — includes full graph_events (nodes); upserted via POST /event.
- *   4. Contacts   — with current segment_ids snapshot; sent to POST /sync/contacts.
+ *   3. Campaigns  — includes full graph_events (nodes).
+ *   4. Contacts   — {@code mautic.lead_post_save} with {@code segment_ids} for full membership snapshot.
+ *   5. Finalize   — {@code mautic.sync_completed} pseudo-event carrying ID lists for reconciliation.
  *
- * Each entity type is sent in chunks of {@see CHUNK_SIZE} per HTTP request via {@see ResilientEventSender}.
- * Contact pages are fetched with a joined segment-membership query to minimise round trips.
+ * A new sync_id UUID is generated at the start of each run via {@see SyncSessionManager::createNewSession()}.
+ * It is embedded in every event batch payload root ({@code sync_id} key) and persisted in the
+ * integration feature_settings so all subsequent live events also carry the same session identifier.
  */
 final class BulkSyncService
 {
@@ -33,6 +35,7 @@ final class BulkSyncService
         private ResilientEventSender $sender,
         private InsightsPublishedIntegrationFinder $integrationFinder,
         private InsightsHttpTokenResolver $httpTokenResolver,
+        private SyncSessionManager $syncSessionManager,
         private LoggerInterface $logger,
     ) {
     }
@@ -47,14 +50,16 @@ final class BulkSyncService
     private array $syncedCampaignIds = [];
 
     /**
-     * Runs the full sync in order: segments → emails → campaigns → contacts → reconcile.
+     * Runs the full sync: segments → emails → campaigns → contacts → mautic.sync_completed.
      *
-     * Reconcile is called once at the end with the complete set of IDs seen during the sync.
-     * The app soft-deletes entities that exist in its tables but are absent from these ID sets —
-     * resolving the gap where entities deleted while the plugin was disabled are never reported
-     * via normal {@code *_post_delete} events.
+     * A fresh sync_id is generated and persisted at the start of each run so the session
+     * identifier is stable for all subsequent live events until the next sync.
      *
-     * Returns the total number of entities dispatched across all types.
+     * The finalization event ({@code mautic.sync_completed}) carries the complete set of seen IDs
+     * for low-cardinality entity types so the app can soft-delete stale rows (entities that were
+     * deleted while the plugin was disabled and never reported via normal *_post_delete events).
+     *
+     * Returns the total number of entities dispatched.
      */
     public function syncAll(): int
     {
@@ -74,19 +79,24 @@ final class BulkSyncService
             return 0;
         }
 
+        $syncId = $this->syncSessionManager->createNewSession();
+
         $this->syncedSegmentIds = [];
         $this->syncedEmailIds = [];
         $this->syncedCampaignIds = [];
 
         $total = 0;
-        $total += $this->syncSegments($token);
-        $total += $this->syncEmails($token);
-        $total += $this->syncCampaigns($token);
-        $total += $this->syncContacts($token);
+        $total += $this->syncSegments($token, $syncId);
+        $total += $this->syncEmails($token, $syncId);
+        $total += $this->syncCampaigns($token, $syncId);
+        $total += $this->syncContacts($token, $syncId);
 
-        $this->sendReconcile($token);
+        $this->sendFinalizationEvent($token, $syncId);
 
-        $this->logger->info('MauticInsights BulkSync: completed.', ['total_entities' => $total]);
+        $this->logger->info('MauticInsights BulkSync: completed.', [
+            'total_entities' => $total,
+            'sync_id' => $syncId,
+        ]);
 
         return $total;
     }
@@ -95,7 +105,7 @@ final class BulkSyncService
     // Segments
     // -------------------------------------------------------------------------
 
-    private function syncSegments(string $token): int
+    private function syncSegments(string $token, string $syncId): int
     {
         $ts = $this->nowUtcString();
         $offset = 0;
@@ -133,7 +143,7 @@ final class BulkSyncService
                 ];
             }
 
-            $total += $this->sendEventChunks($token, $events, 'segments');
+            $total += $this->sendEventChunks($token, $syncId, $events, 'segments');
             $offset += self::PAGE_SIZE;
 
             if (\count($rows) < self::PAGE_SIZE) {
@@ -148,7 +158,7 @@ final class BulkSyncService
     // Emails
     // -------------------------------------------------------------------------
 
-    private function syncEmails(string $token): int
+    private function syncEmails(string $token, string $syncId): int
     {
         $ts = $this->nowUtcString();
         $offset = 0;
@@ -189,7 +199,7 @@ final class BulkSyncService
                 ];
             }
 
-            $total += $this->sendEventChunks($token, $events, 'emails');
+            $total += $this->sendEventChunks($token, $syncId, $events, 'emails');
             $offset += self::PAGE_SIZE;
 
             if (\count($rows) < self::PAGE_SIZE) {
@@ -204,7 +214,7 @@ final class BulkSyncService
     // Campaigns (with graph events)
     // -------------------------------------------------------------------------
 
-    private function syncCampaigns(string $token): int
+    private function syncCampaigns(string $token, string $syncId): int
     {
         $ts = $this->nowUtcString();
         $offset = 0;
@@ -244,7 +254,7 @@ final class BulkSyncService
                 ];
             }
 
-            $total += $this->sendEventChunks($token, $events, 'campaigns');
+            $total += $this->sendEventChunks($token, $syncId, $events, 'campaigns');
             $offset += self::PAGE_SIZE;
 
             if (\count($ids) < self::PAGE_SIZE) {
@@ -322,7 +332,12 @@ final class BulkSyncService
     // Contacts
     // -------------------------------------------------------------------------
 
-    private function syncContacts(string $token): int
+    /**
+     * Syncs contacts as {@code mautic.lead_post_save} events via the standard POST /event endpoint.
+     * Each event includes {@code segment_ids} so the app can perform a full membership replacement
+     * in a single pass — no separate /sync/contacts endpoint required.
+     */
+    private function syncContacts(string $token, string $syncId): int
     {
         $ts = $this->nowUtcString();
         $offset = 0;
@@ -346,10 +361,10 @@ final class BulkSyncService
             $ids = array_column($leads, 'id');
             $segmentMap = $this->fetchContactSegmentIds($ids);
 
-            $contacts = [];
+            $events = [];
             foreach ($leads as $lead) {
                 $cid = (int) $lead['id'];
-                $props = [];
+                $props = ['operation' => 'sync'];
                 if (null !== $lead['email'] && '' !== $lead['email']) {
                     $props['email'] = $lead['email'];
                 }
@@ -369,7 +384,8 @@ final class BulkSyncService
                     $props['points'] = (int) $lead['points'];
                 }
 
-                $contacts[] = [
+                $events[] = [
+                    'event' => 'mautic.lead_post_save',
                     'contact_id' => $cid,
                     'ts' => $ts,
                     'segment_ids' => $segmentMap[$cid] ?? [],
@@ -377,7 +393,7 @@ final class BulkSyncService
                 ];
             }
 
-            $total += $this->sendContactChunks($token, $contacts);
+            $total += $this->sendEventChunks($token, $syncId, $events, 'contacts');
             $offset += self::PAGE_SIZE;
 
             if (\count($leads) < self::PAGE_SIZE) {
@@ -416,39 +432,51 @@ final class BulkSyncService
     }
 
     // -------------------------------------------------------------------------
-    // Reconcile
+    // Finalization
     // -------------------------------------------------------------------------
 
     /**
-     * Sends the complete set of IDs for low-cardinality entity types (campaigns, segments, emails)
-     * so the app can soft-delete entities absent from Mautic (deleted while plugin was disabled).
+     * Sends a single {@code mautic.sync_completed} pseudo-event via POST /event.
      *
-     * Contacts are intentionally excluded: with potentially millions of contacts the ID list
-     * would be a prohibitively large HTTP payload and produce slow SQL anti-joins.
-     * Contact deletes are handled by live {@code mautic.lead_post_delete} events; total counts
-     * are reconciled by the periodic {@code /status} heartbeat.
+     * The event properties carry the complete set of IDs for low-cardinality entity types
+     * (campaigns, segments, emails) so the app can soft-delete rows absent from Mautic
+     * (deleted while the plugin was disabled and never reported via normal *_post_delete events).
+     *
+     * Contacts are intentionally excluded from reconciliation — with potentially millions of
+     * contacts the ID list would be a prohibitively large payload and produce slow SQL anti-joins.
+     * Contact deletes are handled by live {@code mautic.lead_post_delete} events.
      */
-    private function sendReconcile(string $token): void
+    private function sendFinalizationEvent(string $token, string $syncId): void
     {
-        $payload = [];
+        $props = ['sync_id' => $syncId];
 
         if ([] !== $this->syncedCampaignIds) {
-            $payload['campaigns'] = array_values(array_unique($this->syncedCampaignIds));
+            $props['campaigns'] = array_values(array_unique($this->syncedCampaignIds));
         }
         if ([] !== $this->syncedSegmentIds) {
-            $payload['segments'] = array_values(array_unique($this->syncedSegmentIds));
+            $props['segments'] = array_values(array_unique($this->syncedSegmentIds));
         }
         if ([] !== $this->syncedEmailIds) {
-            $payload['emails'] = array_values(array_unique($this->syncedEmailIds));
+            $props['emails'] = array_values(array_unique($this->syncedEmailIds));
         }
 
-        if ([] === $payload) {
-            return;
-        }
+        $event = [
+            'event' => 'mautic.sync_completed',
+            'ts' => $this->nowUtcString(),
+            'properties' => $props,
+        ];
 
-        $ok = $this->sender->send(InsightsApiConfig::SYNC_RECONCILE_URL, $token, $payload);
+        $payload = [
+            'events' => [$event],
+            'sync_id' => $syncId,
+        ];
+
+        $ok = $this->sender->send(InsightsApiConfig::EVENT_NOTIFY_URL, $token, $payload);
         if (!$ok) {
-            $this->logger->error('MauticInsights BulkSync: reconcile request failed — stale entities may remain in the app.');
+            $this->logger->error(
+                'MauticInsights BulkSync: finalization event failed — stale entities may remain in the app.',
+                ['sync_id' => $syncId],
+            );
         }
     }
 
@@ -459,40 +487,16 @@ final class BulkSyncService
     /**
      * @param list<array<string, mixed>> $events
      */
-    private function sendEventChunks(string $token, array $events, string $type): int
+    private function sendEventChunks(string $token, string $syncId, array $events, string $type): int
     {
         $total = 0;
         foreach (array_chunk($events, self::CHUNK_SIZE) as $chunk) {
-            $ok = $this->sender->sendEvents(InsightsApiConfig::EVENT_NOTIFY_URL, $token, $chunk);
+            $payload = ['events' => $chunk, 'sync_id' => $syncId];
+            $ok = $this->sender->send(InsightsApiConfig::EVENT_NOTIFY_URL, $token, $payload);
             if (!$ok) {
                 $this->logger->error(
                     'MauticInsights BulkSync: chunk send failed.',
-                    ['type' => $type, 'count' => \count($chunk)],
-                );
-            } else {
-                $total += \count($chunk);
-            }
-        }
-
-        return $total;
-    }
-
-    /**
-     * @param list<array<string, mixed>> $contacts
-     */
-    private function sendContactChunks(string $token, array $contacts): int
-    {
-        $total = 0;
-        foreach (array_chunk($contacts, self::CHUNK_SIZE) as $chunk) {
-            $ok = $this->sender->send(
-                InsightsApiConfig::SYNC_CONTACTS_URL,
-                $token,
-                ['contacts' => $chunk],
-            );
-            if (!$ok) {
-                $this->logger->error(
-                    'MauticInsights BulkSync: contact chunk send failed.',
-                    ['count' => \count($chunk)],
+                    ['type' => $type, 'count' => \count($chunk), 'sync_id' => $syncId],
                 );
             } else {
                 $total += \count($chunk);

@@ -19,6 +19,7 @@ use MauticPlugin\MauticInsightsBundle\Service\InsightsLastApiTelemetry;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsOutboundTokenProvider;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPluginLogger;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPluginLoggingFeatureReader;
+use MauticPlugin\MauticInsightsBundle\Service\SyncSessionManager;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
@@ -68,13 +69,17 @@ return function (ContainerConfigurator $configurator): void {
     $services->set(InsightsOutboundTokenProvider::class)
         ->arg('$logger', service(InsightsPluginLogger::class));
 
+    $services->set(SyncSessionManager::class)
+        ->arg('$logger', service(InsightsPluginLogger::class));
+
     $services->set(MauticEventBuffer::class)
         ->arg('$outboundTokenProvider', service(InsightsOutboundTokenProvider::class))
         ->arg('$persistentBuffer', service(ConfigurablePersistentEventBuffer::class))
         ->arg('$sendGate', service(InsightsApiSendGate::class))
         ->arg('$flushSize', 50)
         ->arg('$notifyUrl', InsightsApiConfig::EVENT_NOTIFY_URL)
-        ->arg('$requestPayloadRootKey', 'events');
+        ->arg('$requestPayloadRootKey', 'events')
+        ->arg('$syncSessionManager', service(SyncSessionManager::class));
 
     $services->set(InsightsPluginLogger::class)
         ->arg('$inner', service('logger'))

@@ -10,6 +10,7 @@ use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsApiSendGate;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsOutboundTokenProvider;
 use MauticPlugin\MauticInsightsBundle\Service\ResilientEventSender;
+use MauticPlugin\MauticInsightsBundle\Service\SyncSessionManager;
 use Psr\Log\LoggerInterface;
 use Throwable;
 
@@ -48,6 +49,7 @@ final class MauticEventBuffer
         private string $requestPayloadRootKey = 'events',
         private ?LoggerInterface $logger = null,
         private string $httpMethod = 'POST',
+        private ?SyncSessionManager $syncSessionManager = null,
     ) {
     }
 
@@ -150,8 +152,13 @@ final class MauticEventBuffer
 
         $failed = [];
 
+        $syncId = $this->syncSessionManager?->getSyncId();
+
         foreach (array_chunk($events, self::MAX_EVENTS_PER_REQUEST) as $chunk) {
             $payload = [$this->requestPayloadRootKey => $chunk];
+            if (null !== $syncId && '' !== $syncId) {
+                $payload['sync_id'] = $syncId;
+            }
             if (!$this->resilientEventSender->send($this->notifyUrl, $token, $payload, $this->httpMethod)) {
                 if (!$this->persistentBuffer->isEnabled()) {
                     $this->logger?->critical('MauticInsights: API request failed and durable buffer is off — events dropped permanently.', ['count' => \count($chunk), 'url' => $this->notifyUrl]);

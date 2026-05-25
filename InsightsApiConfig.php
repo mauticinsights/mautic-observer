@@ -37,6 +37,13 @@ final class InsightsApiConfig
      */
     public const FEATURE_PLUGIN_LOGGING = 'plugin_logging';
 
+    /**
+     * Stored at featureSettings top-level (not under the 'integration' subkey managed by the UI form).
+     * Set once when a sync session starts and kept for the lifetime of the plugin session.
+     * Included in every outbound event batch payload under the root key {@code sync_id}.
+     */
+    public const FEATURE_SYNC_ID = 'sync_id';
+
     /** Base URL for outbound Mautic Insights API (no trailing slash). */
     public const API_BASE_URL = 'https://api.mauticinsights.com';
     // public const API_BASE_URL = 'https://eoovk3u9orx0b6g.m.pipedream.net';
@@ -44,15 +51,6 @@ final class InsightsApiConfig
     public const STATUS_NOTIFY_URL = self::API_BASE_URL.'/status';
 
     public const EVENT_NOTIFY_URL = self::API_BASE_URL.'/event';
-
-    /** Bulk contact sync endpoint — accepts POST body {@code { "contacts": [...] }}. */
-    public const SYNC_CONTACTS_URL = self::API_BASE_URL.'/sync/contacts';
-
-    /**
-     * Reconcile endpoint — called once after a full sync run with the complete set of IDs
-     * present in Mautic. The app soft-deletes anything absent from the provided ID sets.
-     */
-    public const SYNC_RECONCILE_URL = self::API_BASE_URL.'/sync/reconcile';
 
     /**
      * @deprecated segment lifecycle rows use {@see self::EVENT_NOTIFY_URL} with root key {@code events}
