@@ -45,9 +45,6 @@ final class BulkSyncService
     /** @var list<int> */
     private array $syncedCampaignIds = [];
 
-    /** @var list<int> */
-    private array $syncedContactIds = [];
-
     /**
      * Runs the full sync in order: segments → emails → campaigns → contacts → reconcile.
      *
@@ -70,7 +67,6 @@ final class BulkSyncService
         $this->syncedSegmentIds = [];
         $this->syncedEmailIds = [];
         $this->syncedCampaignIds = [];
-        $this->syncedContactIds = [];
 
         $total = 0;
         $total += $this->syncSegments($token);
@@ -343,7 +339,6 @@ final class BulkSyncService
             $contacts = [];
             foreach ($leads as $lead) {
                 $cid = (int) $lead['id'];
-                $this->syncedContactIds[] = $cid;
                 $props = [];
                 if (null !== $lead['email'] && '' !== $lead['email']) {
                     $props['email'] = $lead['email'];
@@ -415,8 +410,13 @@ final class BulkSyncService
     // -------------------------------------------------------------------------
 
     /**
-     * Sends the complete set of IDs encountered during the sync run so the app can
-     * soft-delete entities that are absent from Mautic (deleted while plugin was disabled).
+     * Sends the complete set of IDs for low-cardinality entity types (campaigns, segments, emails)
+     * so the app can soft-delete entities absent from Mautic (deleted while plugin was disabled).
+     *
+     * Contacts are intentionally excluded: with potentially millions of contacts the ID list
+     * would be a prohibitively large HTTP payload and produce slow SQL anti-joins.
+     * Contact deletes are handled by live {@code mautic.lead_post_delete} events; total counts
+     * are reconciled by the periodic {@code /status} heartbeat.
      */
     private function sendReconcile(string $token): void
     {
@@ -430,9 +430,6 @@ final class BulkSyncService
         }
         if ([] !== $this->syncedEmailIds) {
             $payload['emails'] = array_values(array_unique($this->syncedEmailIds));
-        }
-        if ([] !== $this->syncedContactIds) {
-            $payload['contacts'] = array_values(array_unique($this->syncedContactIds));
         }
 
         if ([] === $payload) {
