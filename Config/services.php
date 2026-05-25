@@ -8,11 +8,13 @@ use MauticPlugin\MauticInsightsBundle\Buffer\DatabaseEventBuffer;
 use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
 use MauticPlugin\MauticInsightsBundle\Buffer\DisabledPersistentEventBuffer;
 use MauticPlugin\MauticInsightsBundle\Buffer\FileEventBuffer;
+use Mautic\IntegrationsBundle\Facade\EncryptionService;
 use MauticPlugin\MauticInsightsBundle\Buffer\MauticEventBuffer;
 use MauticPlugin\MauticInsightsBundle\Buffer\RedisEventBuffer;
 use MauticPlugin\MauticInsightsBundle\EventSubscriber\BulkSyncOnEnableSubscriber;
 use MauticPlugin\MauticInsightsBundle\EventSubscriber\EventBufferFlushSubscriber;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
+use MauticPlugin\MauticInsightsBundle\Service\SafeEncryptionService;
 use MauticPlugin\MauticInsightsBundle\Integration\MauticInsightsIntegration;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsApiOutageCoordinator;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsApiSendGate;
@@ -52,6 +54,8 @@ return function (ContainerConfigurator $configurator): void {
             'Service/SyncSessionManager.php',
             // $dataDir must be explicit for plugin_published_state.json tracking.
             'EventSubscriber/BulkSyncOnEnableSubscriber.php',
+            // Registered explicitly as override for EncryptionService::class.
+            'Service/SafeEncryptionService.php',
         ]
     );
 
@@ -98,6 +102,10 @@ return function (ContainerConfigurator $configurator): void {
 
     $services->set(InsightsLastApiTelemetry::class)
         ->arg('$dataDir', '%kernel.project_dir%/var/mauticinsights-buffer');
+
+    // Override IntegrationsBundle's EncryptionService with a safe subclass that handles
+    // empty strings and plain-text values gracefully (PHP 8.2 TypeError prevention).
+    $services->set(EncryptionService::class, SafeEncryptionService::class);
 
     $services->set(BulkSyncOnEnableSubscriber::class)
         ->arg('$dataDir', '%kernel.project_dir%/var/mauticinsights-buffer');
