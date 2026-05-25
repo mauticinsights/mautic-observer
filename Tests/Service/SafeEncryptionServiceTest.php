@@ -7,6 +7,7 @@ namespace MauticPlugin\MauticInsightsBundle\Tests\Service;
 use Mautic\CoreBundle\Helper\EncryptionHelper;
 use MauticPlugin\MauticInsightsBundle\Service\SafeEncryptionService;
 use PHPUnit\Framework\TestCase;
+use TypeError;
 
 /**
  * Unit tests for SafeEncryptionService.
@@ -41,7 +42,7 @@ final class SafeEncryptionServiceTest extends TestCase
         $helper->expects($this->never())->method('decrypt');
 
         $service = new SafeEncryptionService($helper);
-        $result  = $service->decrypt(['http_token' => '']);
+        $result = $service->decrypt(['http_token' => '']);
 
         $this->assertSame(['http_token' => ''], $result);
     }
@@ -52,7 +53,7 @@ final class SafeEncryptionServiceTest extends TestCase
         $helper->expects($this->never())->method('decrypt');
 
         $service = new SafeEncryptionService($helper);
-        $result  = $service->decrypt(['http_token' => null]);
+        $result = $service->decrypt(['http_token' => null]);
 
         $this->assertSame(['http_token' => null], $result);
     }
@@ -64,7 +65,7 @@ final class SafeEncryptionServiceTest extends TestCase
         $helper->expects($this->never())->method('decrypt');
 
         $service = new SafeEncryptionService($helper);
-        $result  = $service->decrypt(['http_token' => 'plain-token-no-pipe']);
+        $result = $service->decrypt(['http_token' => 'plain-token-no-pipe']);
 
         $this->assertSame(['http_token' => false], $result);
     }
@@ -102,7 +103,7 @@ final class SafeEncryptionServiceTest extends TestCase
             ->willReturn('decrypted-token');
 
         $service = new SafeEncryptionService($helper);
-        $result  = $service->decrypt(['http_token' => 'base64cipher|base64iv']);
+        $result = $service->decrypt(['http_token' => 'base64cipher|base64iv']);
 
         $this->assertSame(['http_token' => 'decrypted-token'], $result);
     }
@@ -139,7 +140,7 @@ final class SafeEncryptionServiceTest extends TestCase
     public function testDecryptCatchesThrowableFromHelperAndReturnsFalseForScalar(): void
     {
         $helper = $this->createMock(EncryptionHelper::class);
-        $helper->method('decrypt')->willThrowException(new \TypeError('base64_decode(): null given'));
+        $helper->method('decrypt')->willThrowException(new TypeError('base64_decode(): null given'));
 
         $service = new SafeEncryptionService($helper);
 
@@ -151,10 +152,10 @@ final class SafeEncryptionServiceTest extends TestCase
     public function testDecryptCatchesThrowableFromHelperAndReturnsFalseForArrayValue(): void
     {
         $helper = $this->createMock(EncryptionHelper::class);
-        $helper->method('decrypt')->willThrowException(new \TypeError('base64_decode(): null given'));
+        $helper->method('decrypt')->willThrowException(new TypeError('base64_decode(): null given'));
 
         $service = new SafeEncryptionService($helper);
-        $result  = $service->decrypt(['http_token' => 'has|pipe']);
+        $result = $service->decrypt(['http_token' => 'has|pipe']);
 
         $this->assertSame(['http_token' => false], $result);
     }
@@ -172,17 +173,17 @@ final class SafeEncryptionServiceTest extends TestCase
             ->willReturn('decrypted');
 
         $service = new SafeEncryptionService($helper);
-        $result  = $service->decrypt([
-            'http_token'   => 'cipher|iv',
-            'empty_field'  => '',
-            'null_field'   => null,
-            'plain_field'  => 'nopipe',
+        $result = $service->decrypt([
+            'http_token' => 'cipher|iv',
+            'empty_field' => '',
+            'null_field' => null,
+            'plain_field' => 'nopipe',
         ]);
 
         $this->assertSame([
-            'http_token'  => 'decrypted',
+            'http_token' => 'decrypted',
             'empty_field' => '',
-            'null_field'  => null,
+            'null_field' => null,
             'plain_field' => false,
         ], $result);
     }
@@ -215,7 +216,7 @@ final class SafeEncryptionServiceTest extends TestCase
             ]);
 
         $service = new SafeEncryptionService($helper);
-        $result  = $service->encrypt(['field_a' => 'token-a', 'field_b' => 'token-b']);
+        $result = $service->encrypt(['field_a' => 'token-a', 'field_b' => 'token-b']);
 
         $this->assertSame(['field_a' => 'enc-a', 'field_b' => 'enc-b'], $result);
     }

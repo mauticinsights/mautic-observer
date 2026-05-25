@@ -9,6 +9,8 @@ use Mautic\PluginBundle\Entity\Integration;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsHttpTokenResolver;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
+use TypeError;
 
 /**
  * Unit tests for InsightsHttpTokenResolver.
@@ -27,7 +29,7 @@ final class InsightsHttpTokenResolverTest extends TestCase
     public function testReturnsTokenDirectlyWhenNoEncryptionHelper(): void
     {
         $integration = $this->integration(['http_token' => 'my-token']);
-        $resolver    = new InsightsHttpTokenResolver(null);
+        $resolver = new InsightsHttpTokenResolver(null);
 
         $this->assertSame('my-token', $resolver->resolve($integration));
     }
@@ -35,7 +37,7 @@ final class InsightsHttpTokenResolverTest extends TestCase
     public function testReturnsEmptyStringWhenApiKeysIsEmpty(): void
     {
         $integration = $this->integration([]);
-        $resolver    = new InsightsHttpTokenResolver(null);
+        $resolver = new InsightsHttpTokenResolver(null);
 
         $this->assertSame('', $resolver->resolve($integration));
     }
@@ -43,7 +45,7 @@ final class InsightsHttpTokenResolverTest extends TestCase
     public function testTrimsWhitespaceFromToken(): void
     {
         $integration = $this->integration(['http_token' => '  spaced  ']);
-        $resolver    = new InsightsHttpTokenResolver(null);
+        $resolver = new InsightsHttpTokenResolver(null);
 
         $this->assertSame('spaced', $resolver->resolve($integration));
     }
@@ -60,7 +62,7 @@ final class InsightsHttpTokenResolverTest extends TestCase
         $helper->expects($this->never())->method('decrypt');
 
         $integration = $this->integration(['http_token' => '']);
-        $resolver    = new InsightsHttpTokenResolver($helper);
+        $resolver = new InsightsHttpTokenResolver($helper);
 
         $this->assertSame('', $resolver->resolve($integration));
     }
@@ -82,7 +84,7 @@ final class InsightsHttpTokenResolverTest extends TestCase
         $helper->method('decrypt')->willReturn(false);
 
         $integration = $this->integration(['http_token' => 'plain-text-token']);
-        $resolver    = new InsightsHttpTokenResolver($helper);
+        $resolver = new InsightsHttpTokenResolver($helper);
 
         $this->assertSame('plain-text-token', $resolver->resolve($integration));
     }
@@ -97,11 +99,11 @@ final class InsightsHttpTokenResolverTest extends TestCase
         // has no '|' separator and $encryptData[1] is undefined.
         $helper = $this->createMock(EncryptionHelper::class);
         $helper->method('decrypt')->willThrowException(
-            new \TypeError('base64_decode(): Argument #1 must be string, null given')
+            new TypeError('base64_decode(): Argument #1 must be string, null given')
         );
 
         $integration = $this->integration(['http_token' => 'some-value-that-triggers-crash']);
-        $resolver    = new InsightsHttpTokenResolver($helper);
+        $resolver = new InsightsHttpTokenResolver($helper);
 
         // Must not throw — falls back to raw value.
         $this->assertSame('some-value-that-triggers-crash', $resolver->resolve($integration));
@@ -111,10 +113,10 @@ final class InsightsHttpTokenResolverTest extends TestCase
     {
         // Covers Mautic error-handler converting E_WARNING to \RuntimeException.
         $helper = $this->createMock(EncryptionHelper::class);
-        $helper->method('decrypt')->willThrowException(new \RuntimeException('Undefined array key 1'));
+        $helper->method('decrypt')->willThrowException(new RuntimeException('Undefined array key 1'));
 
         $integration = $this->integration(['http_token' => 'raw-token']);
-        $resolver    = new InsightsHttpTokenResolver($helper);
+        $resolver = new InsightsHttpTokenResolver($helper);
 
         $this->assertSame('raw-token', $resolver->resolve($integration));
     }
@@ -132,7 +134,7 @@ final class InsightsHttpTokenResolverTest extends TestCase
             ->willReturn('decrypted-token');
 
         $integration = $this->integration(['http_token' => 'encrypted-value']);
-        $resolver    = new InsightsHttpTokenResolver($helper);
+        $resolver = new InsightsHttpTokenResolver($helper);
 
         $this->assertSame('decrypted-token', $resolver->resolve($integration));
     }
@@ -155,7 +157,7 @@ final class InsightsHttpTokenResolverTest extends TestCase
     {
         // Integration::getApiKeys() might return [] for null DB value (stub does so),
         // but guard is in place for any non-array value coming from a real entity.
-        $resolver    = new InsightsHttpTokenResolver(null);
+        $resolver = new InsightsHttpTokenResolver(null);
         $integration = $this->integration([]);
 
         $this->assertSame('', $resolver->resolve($integration));
@@ -172,7 +174,7 @@ final class InsightsHttpTokenResolverTest extends TestCase
 
         $integration = $this->integration([
             InsightsApiConfig::HTTP_TOKEN_FIELD => 'my-real-token',
-            'other_field'                       => 'ignore-me',
+            'other_field' => 'ignore-me',
         ]);
         $resolver = new InsightsHttpTokenResolver($helper);
 

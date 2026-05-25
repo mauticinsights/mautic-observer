@@ -19,6 +19,7 @@
         "ext-redis": "Optional: Redis fallback for the API event buffer when the filesystem cache directory is not writable."
     },
     "require-dev": {
+        "dg/bypass-finals": "^1.9",
         "doctrine/dbal": "^3.8",
         "doctrine/orm": "^2.14",
         "friendsofphp/php-cs-fixer": "^3.59",

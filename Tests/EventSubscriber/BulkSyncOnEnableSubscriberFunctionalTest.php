@@ -18,6 +18,7 @@ use MauticPlugin\MauticInsightsBundle\Service\InsightsHttpTokenResolver;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPublishedIntegrationFinder;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use RuntimeException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Event\ConsoleTerminateEvent;
 use Symfony\Component\Console\Input\ArrayInput;
@@ -50,7 +51,7 @@ final class BulkSyncOnEnableSubscriberFunctionalTest extends TestCase
         $map = BulkSyncOnEnableSubscriber::getSubscribedEvents();
 
         $terminateEntry = $map[\Symfony\Component\HttpKernel\KernelEvents::TERMINATE];
-        $priority       = is_array($terminateEntry) ? (int) ($terminateEntry[1] ?? 0) : 0;
+        $priority = is_array($terminateEntry) ? (int) ($terminateEntry[1] ?? 0) : 0;
 
         // IntegrationConfigSubscriber uses -1024; BulkSync must run after it.
         $this->assertLessThanOrEqual(-1025, $priority);
@@ -64,7 +65,7 @@ final class BulkSyncOnEnableSubscriberFunctionalTest extends TestCase
     {
         $syncService = $this->mockSyncService(expectedCalls: 1);
         $integration = $this->integration(published: true, token: 'valid-token');
-        $subscriber  = $this->makeSubscriber($syncService, $integration);
+        $subscriber = $this->makeSubscriber($syncService, $integration);
 
         $subscriber->onConfigSave(new ConfigSaveEvent($integration));
         $subscriber->onHttpTerminate($this->makeTerminateEvent());
@@ -74,7 +75,7 @@ final class BulkSyncOnEnableSubscriberFunctionalTest extends TestCase
     {
         $syncService = $this->mockSyncService(expectedCalls: 0);
         $integration = $this->integration(published: false, token: 'valid-token');
-        $subscriber  = $this->makeSubscriber($syncService, $integration);
+        $subscriber = $this->makeSubscriber($syncService, $integration);
 
         $subscriber->onConfigSave(new ConfigSaveEvent($integration));
         $subscriber->onHttpTerminate($this->makeTerminateEvent());
@@ -84,7 +85,7 @@ final class BulkSyncOnEnableSubscriberFunctionalTest extends TestCase
     {
         $syncService = $this->mockSyncService(expectedCalls: 0);
         $integration = $this->integration(published: true, token: '');
-        $subscriber  = $this->makeSubscriber($syncService, $integration);
+        $subscriber = $this->makeSubscriber($syncService, $integration);
 
         $subscriber->onConfigSave(new ConfigSaveEvent($integration));
         $subscriber->onHttpTerminate($this->makeTerminateEvent());
@@ -94,7 +95,7 @@ final class BulkSyncOnEnableSubscriberFunctionalTest extends TestCase
     {
         $syncService = $this->mockSyncService(expectedCalls: 0);
         $integration = new Integration(true, [], 'SomeOtherPlugin', ['http_token' => 'tok']);
-        $subscriber  = $this->makeSubscriberWithFinder(
+        $subscriber = $this->makeSubscriberWithFinder(
             $syncService,
             InsightsPublishedIntegrationFinder::createForTest($this->integration(published: true, token: 'tok')),
         );
@@ -111,7 +112,7 @@ final class BulkSyncOnEnableSubscriberFunctionalTest extends TestCase
     {
         $syncService = $this->mockSyncService(expectedCalls: 1);
         $integration = $this->integration(published: true, token: 'tok');
-        $subscriber  = $this->makeSubscriber($syncService, $integration);
+        $subscriber = $this->makeSubscriber($syncService, $integration);
 
         $subscriber->onPluginInstall($this->makeInstallEvent(InsightsApiConfig::PLUGIN_BUNDLE));
         $subscriber->onHttpTerminate($this->makeTerminateEvent());
@@ -121,7 +122,7 @@ final class BulkSyncOnEnableSubscriberFunctionalTest extends TestCase
     {
         $syncService = $this->mockSyncService(expectedCalls: 0);
         $integration = $this->integration(published: true, token: 'tok');
-        $subscriber  = $this->makeSubscriber($syncService, $integration);
+        $subscriber = $this->makeSubscriber($syncService, $integration);
 
         $subscriber->onPluginInstall($this->makeInstallEvent('SomethingElseBundle'));
         $subscriber->onHttpTerminate($this->makeTerminateEvent());
@@ -131,7 +132,7 @@ final class BulkSyncOnEnableSubscriberFunctionalTest extends TestCase
     {
         $syncService = $this->mockSyncService(expectedCalls: 0);
         $integration = $this->integration(published: false, token: 'tok');
-        $subscriber  = $this->makeSubscriber($syncService, $integration);
+        $subscriber = $this->makeSubscriber($syncService, $integration);
 
         $subscriber->onPluginInstall($this->makeInstallEvent(InsightsApiConfig::PLUGIN_BUNDLE));
         $subscriber->onHttpTerminate($this->makeTerminateEvent());
@@ -145,7 +146,7 @@ final class BulkSyncOnEnableSubscriberFunctionalTest extends TestCase
     {
         $syncService = $this->mockSyncService(expectedCalls: 1);
         $integration = $this->integration(published: true, token: 'tok');
-        $subscriber  = $this->makeSubscriber($syncService, $integration);
+        $subscriber = $this->makeSubscriber($syncService, $integration);
 
         $subscriber->onPluginUpdate($this->makeUpdateEvent(InsightsApiConfig::PLUGIN_BUNDLE));
         $subscriber->onHttpTerminate($this->makeTerminateEvent());
@@ -155,7 +156,7 @@ final class BulkSyncOnEnableSubscriberFunctionalTest extends TestCase
     {
         $syncService = $this->mockSyncService(expectedCalls: 0);
         $integration = $this->integration(published: true, token: 'tok');
-        $subscriber  = $this->makeSubscriber($syncService, $integration);
+        $subscriber = $this->makeSubscriber($syncService, $integration);
 
         $subscriber->onPluginUpdate($this->makeUpdateEvent('SomethingElseBundle'));
         $subscriber->onHttpTerminate($this->makeTerminateEvent());
@@ -169,7 +170,7 @@ final class BulkSyncOnEnableSubscriberFunctionalTest extends TestCase
     {
         $syncService = $this->mockSyncService(expectedCalls: 1);
         $integration = $this->integration(published: true, token: 'tok');
-        $subscriber  = $this->makeSubscriber($syncService, $integration);
+        $subscriber = $this->makeSubscriber($syncService, $integration);
 
         $subscriber->onConfigSave(new ConfigSaveEvent($integration));
         $subscriber->onConsoleTerminate($this->makeConsoleTerminateEvent());
@@ -183,7 +184,7 @@ final class BulkSyncOnEnableSubscriberFunctionalTest extends TestCase
     {
         $syncService = $this->mockSyncService(expectedCalls: 1);
         $integration = $this->integration(published: true, token: 'tok');
-        $subscriber  = $this->makeSubscriber($syncService, $integration);
+        $subscriber = $this->makeSubscriber($syncService, $integration);
 
         // Two saves before terminate — sync should still run exactly once.
         $subscriber->onConfigSave(new ConfigSaveEvent($integration));
@@ -198,10 +199,10 @@ final class BulkSyncOnEnableSubscriberFunctionalTest extends TestCase
     public function testSyncExceptionDoesNotPropagateToKernelTerminate(): void
     {
         $syncService = $this->createMock(BulkSyncService::class);
-        $syncService->method('syncAll')->willThrowException(new \RuntimeException('DB is down'));
+        $syncService->method('syncAll')->willThrowException(new RuntimeException('DB is down'));
 
         $integration = $this->integration(published: true, token: 'tok');
-        $subscriber  = $this->makeSubscriber($syncService, $integration);
+        $subscriber = $this->makeSubscriber($syncService, $integration);
 
         $subscriber->onConfigSave(new ConfigSaveEvent($integration));
 
@@ -213,10 +214,10 @@ final class BulkSyncOnEnableSubscriberFunctionalTest extends TestCase
     public function testSyncExceptionDoesNotPropagateToConsoleTerminate(): void
     {
         $syncService = $this->createMock(BulkSyncService::class);
-        $syncService->method('syncAll')->willThrowException(new \RuntimeException('network failure'));
+        $syncService->method('syncAll')->willThrowException(new RuntimeException('network failure'));
 
         $integration = $this->integration(published: true, token: 'tok');
-        $subscriber  = $this->makeSubscriber($syncService, $integration);
+        $subscriber = $this->makeSubscriber($syncService, $integration);
 
         $subscriber->onConfigSave(new ConfigSaveEvent($integration));
         $subscriber->onConsoleTerminate($this->makeConsoleTerminateEvent());
@@ -263,7 +264,7 @@ final class BulkSyncOnEnableSubscriberFunctionalTest extends TestCase
             $published,
             [],
             InsightsApiConfig::NAME,
-            $token !== '' ? [InsightsApiConfig::HTTP_TOKEN_FIELD => $token] : [],
+            '' !== $token ? [InsightsApiConfig::HTTP_TOKEN_FIELD => $token] : [],
         );
     }
 

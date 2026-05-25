@@ -27,20 +27,3 @@ class PluginUpdateEvent
         return $pluginName === $this->plugin->getName();
     }
 }
-
-class PluginInstallEvent
-{
-    public function __construct(private Plugin $plugin)
-    {
-    }
-
-    public function getPlugin(): Plugin
-    {
-        return $this->plugin;
-    }
-
-    public function checkContext(string $pluginName): bool
-    {
-        return $pluginName === $this->plugin->getName();
-    }
-}
