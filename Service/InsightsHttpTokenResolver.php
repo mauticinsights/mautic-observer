@@ -49,9 +49,15 @@ final class InsightsHttpTokenResolver
         $decrypted = [];
 
         foreach ($keys as $name => $key) {
-            // Mautic's IntegrationsHelper::saveIntegrationConfiguration() restores plain-text keys onto the entity
-            // after saving encrypted keys to DB, so at INTEGRATION_CONFIG_AFTER_SAVE the value is already plain.
-            // Try to decrypt; if it fails the value is already plain text → use as-is.
+            // EncryptionHelper::encrypt() always produces "base64|base64". If the value does not
+            // contain '|' it is already plain text (Mautic restores plain keys onto the entity
+            // after saveIntegrationConfiguration()), so skip decryption to avoid a PHP warning
+            // on the explode('|', $data) inside EncryptionHelper::decrypt().
+            if (!\is_string($key) || !str_contains($key, '|')) {
+                $decrypted[$name] = $key;
+                continue;
+            }
+
             $plain = $helper->decrypt($key, false);
             $decrypted[$name] = (false !== $plain) ? $plain : $key;
         }
