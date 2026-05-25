@@ -10,6 +10,7 @@ use MauticPlugin\MauticInsightsBundle\Buffer\DisabledPersistentEventBuffer;
 use MauticPlugin\MauticInsightsBundle\Buffer\FileEventBuffer;
 use MauticPlugin\MauticInsightsBundle\Buffer\MauticEventBuffer;
 use MauticPlugin\MauticInsightsBundle\Buffer\RedisEventBuffer;
+use MauticPlugin\MauticInsightsBundle\EventSubscriber\BulkSyncOnEnableSubscriber;
 use MauticPlugin\MauticInsightsBundle\EventSubscriber\EventBufferFlushSubscriber;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
 use MauticPlugin\MauticInsightsBundle\Integration\MauticInsightsIntegration;
@@ -49,6 +50,8 @@ return function (ContainerConfigurator $configurator): void {
             'Service/InsightsApiOutageCoordinator.php',
             // $dataDir must be explicit; also avoids accidental EntityManagerInterface injection.
             'Service/SyncSessionManager.php',
+            // $dataDir must be explicit for plugin_published_state.json tracking.
+            'EventSubscriber/BulkSyncOnEnableSubscriber.php',
         ]
     );
 
@@ -95,4 +98,8 @@ return function (ContainerConfigurator $configurator): void {
 
     $services->set(InsightsLastApiTelemetry::class)
         ->arg('$dataDir', '%kernel.project_dir%/var/mauticinsights-buffer');
+
+    $services->set(BulkSyncOnEnableSubscriber::class)
+        ->arg('$dataDir', '%kernel.project_dir%/var/mauticinsights-buffer')
+        ->tag('kernel.event_subscriber');
 };
