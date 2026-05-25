@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace MauticPlugin\MauticInsightsBundle\Service;
 
-use Mautic\IntegrationsBundle\Facade\EncryptionService;
+use Mautic\CoreBundle\Helper\EncryptionHelper;
 use Throwable;
 
 /**
@@ -12,52 +12,76 @@ use Throwable;
  *
  * On fresh plugin installs Mautic seeds api_keys with empty strings
  * (e.g. {'http_token': ''}). After IntegrationsHelper::saveIntegrationConfiguration()
- * the entity's api_keys are restored to plain text. In both cases calling
- * EncryptionHelper::decrypt() emits a PHP Warning (Undefined array key 1 from
- * the '|' split) and on PHP 8.2 throws a TypeError from base64_decode(null),
- * which propagates as HTTP 500 from the integration config save controller.
+ * the entity's api_keys are also temporarily restored to plain text. In both
+ * cases calling EncryptionHelper::decrypt() emits a PHP Warning (Undefined
+ * array key 1 from the '|' split) and on PHP 8.2 throws a TypeError from
+ * base64_decode(null), which propagates as HTTP 500 from the integration config
+ * save controller.
  *
- * This subclass is registered via services.php to override EncryptionService::class
- * so ALL code paths in IntegrationsBundle are covered, not just our own subscribers.
+ * This class replicates the encrypt/decrypt interface of EncryptionService
+ * (without extending it, to keep the plugin self-contained and satisfy PHPStan)
+ * and is registered via services.php as EncryptionService::class so all code
+ * paths in IntegrationsBundle are covered.
  */
-final class SafeEncryptionService extends EncryptionService
+final class SafeEncryptionService
 {
+    public function __construct(
+        private EncryptionHelper $encryptionHelper,
+    ) {
+    }
+
     /**
      * @param mixed $keys
      *
-     * @return array|string|false
+     * @return array<string, mixed>|string
      */
-    public function decrypt($keys, $onlyPrimaryCipher = false)
+    public function encrypt($keys)
+    {
+        if (!is_array($keys)) {
+            return $this->encryptionHelper->encrypt($keys);
+        }
+
+        foreach ($keys as $name => $key) {
+            $keys[$name] = $this->encryptionHelper->encrypt($key);
+        }
+
+        return $keys;
+    }
+
+    /**
+     * @param mixed $keys
+     *
+     * @return array<string, mixed>|string|false
+     */
+    public function decrypt($keys, bool $onlyPrimaryCipher = false)
     {
         if (null === $keys) {
             return [];
         }
 
         if (!is_array($keys)) {
-            return $this->safeDecryptSingle($keys, (bool) $onlyPrimaryCipher);
+            return $this->safeDecryptSingle((string) $keys, $onlyPrimaryCipher);
         }
 
         $result = [];
         foreach ($keys as $name => $key) {
             if (!\is_string($key) || '' === $key) {
-                // Empty/non-string values cannot be encrypted — pass through as-is.
+                // Empty / non-string values are not encrypted — pass through as-is.
                 $result[$name] = $key;
                 continue;
             }
-            $result[$name] = $this->safeDecryptSingle($key, (bool) $onlyPrimaryCipher);
+            $result[$name] = $this->safeDecryptSingle($key, $onlyPrimaryCipher);
         }
 
         return $result;
     }
 
     /**
-     * @param mixed $key
-     *
      * @return string|false
      */
-    private function safeDecryptSingle($key, bool $onlyPrimaryCipher)
+    private function safeDecryptSingle(string $key, bool $onlyPrimaryCipher)
     {
-        if (!\is_string($key) || '' === $key) {
+        if ('' === $key) {
             return false;
         }
 
@@ -70,9 +94,7 @@ final class SafeEncryptionService extends EncryptionService
         }
 
         try {
-            // parent::decrypt() calls $this->encryptionHelper->decrypt() which
-            // is in EncryptionService's private scope and is accessible from here.
-            return parent::decrypt($key, $onlyPrimaryCipher);
+            return $this->encryptionHelper->decrypt($key, $onlyPrimaryCipher);
         } catch (Throwable) {
             return false;
         }
