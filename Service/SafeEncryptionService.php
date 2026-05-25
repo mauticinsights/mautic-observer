@@ -31,11 +31,9 @@ final class SafeEncryptionService
     }
 
     /**
-     * @param mixed $keys
-     *
      * @return array<string, mixed>|string
      */
-    public function encrypt($keys)
+    public function encrypt(mixed $keys): array|string
     {
         if (!is_array($keys)) {
             return $this->encryptionHelper->encrypt($keys);
@@ -49,11 +47,9 @@ final class SafeEncryptionService
     }
 
     /**
-     * @param mixed $keys
-     *
      * @return array<string, mixed>|string|false
      */
-    public function decrypt($keys, bool $onlyPrimaryCipher = false)
+    public function decrypt(mixed $keys, bool $onlyPrimaryCipher = false): array|string|false
     {
         if (null === $keys) {
             return [];
@@ -76,10 +72,7 @@ final class SafeEncryptionService
         return $result;
     }
 
-    /**
-     * @return string|false
-     */
-    private function safeDecryptSingle(string $key, bool $onlyPrimaryCipher)
+    private function safeDecryptSingle(string $key, bool $onlyPrimaryCipher): string|false
     {
         if ('' === $key) {
             return false;

@@ -3,18 +3,17 @@
 declare(strict_types=1);
 
 use Mautic\CoreBundle\DependencyInjection\MauticCoreExtension;
+use Mautic\IntegrationsBundle\Facade\EncryptionService;
 use MauticPlugin\MauticInsightsBundle\Buffer\ConfigurablePersistentEventBuffer;
 use MauticPlugin\MauticInsightsBundle\Buffer\DatabaseEventBuffer;
 use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
 use MauticPlugin\MauticInsightsBundle\Buffer\DisabledPersistentEventBuffer;
 use MauticPlugin\MauticInsightsBundle\Buffer\FileEventBuffer;
-use Mautic\IntegrationsBundle\Facade\EncryptionService;
 use MauticPlugin\MauticInsightsBundle\Buffer\MauticEventBuffer;
 use MauticPlugin\MauticInsightsBundle\Buffer\RedisEventBuffer;
 use MauticPlugin\MauticInsightsBundle\EventSubscriber\BulkSyncOnEnableSubscriber;
 use MauticPlugin\MauticInsightsBundle\EventSubscriber\EventBufferFlushSubscriber;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
-use MauticPlugin\MauticInsightsBundle\Service\SafeEncryptionService;
 use MauticPlugin\MauticInsightsBundle\Integration\MauticInsightsIntegration;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsApiOutageCoordinator;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsApiSendGate;
@@ -22,6 +21,7 @@ use MauticPlugin\MauticInsightsBundle\Service\InsightsLastApiTelemetry;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsOutboundTokenProvider;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPluginLogger;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPluginLoggingFeatureReader;
+use MauticPlugin\MauticInsightsBundle\Service\SafeEncryptionService;
 use MauticPlugin\MauticInsightsBundle\Service\SyncSessionManager;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 

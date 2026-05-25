@@ -10,6 +10,11 @@ namespace Mautic\CoreBundle\Helper;
  */
 class EncryptionHelper
 {
+    public function encrypt(mixed $data): string
+    {
+        return (string) $data;
+    }
+
     /**
      * @return mixed|false
      */
