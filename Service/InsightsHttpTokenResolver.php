@@ -7,6 +7,7 @@ namespace MauticPlugin\MauticInsightsBundle\Service;
 use Mautic\CoreBundle\Helper\EncryptionHelper;
 use Mautic\PluginBundle\Entity\Integration;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
+use Throwable;
 
 /**
  * Reads the outbound Bearer token from {@see Integration::getApiKeys()} {@see InsightsApiConfig::HTTP_TOKEN_FIELD}.
@@ -49,11 +50,22 @@ final class InsightsHttpTokenResolver
         $decrypted = [];
 
         foreach ($keys as $name => $key) {
+            // Skip non-string or empty values — EncryptionHelper::decrypt('') triggers a PHP Warning
+            // (Undefined array key 1) and in PHP 8.2 throws TypeError via openssl_decrypt(null, ...).
+            if (!\is_string($key) || '' === $key) {
+                $decrypted[$name] = $key;
+                continue;
+            }
+
             // Mautic's IntegrationsHelper::saveIntegrationConfiguration() restores plain-text keys onto the entity
             // after saving encrypted keys to DB, so at INTEGRATION_CONFIG_AFTER_SAVE the value is already plain.
-            // Try to decrypt; if it fails the value is already plain text → use as-is.
-            $plain = $helper->decrypt($key, false);
-            $decrypted[$name] = (false !== $plain) ? $plain : $key;
+            // Try to decrypt; if it fails (plain text) use as-is.
+            try {
+                $plain = $helper->decrypt($key, false);
+                $decrypted[$name] = (false !== $plain) ? $plain : $key;
+            } catch (Throwable) {
+                $decrypted[$name] = $key;
+            }
         }
 
         return $decrypted;
