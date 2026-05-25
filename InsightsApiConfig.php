@@ -45,6 +45,9 @@ final class InsightsApiConfig
 
     public const EVENT_NOTIFY_URL = self::API_BASE_URL.'/event';
 
+    /** Bulk contact sync endpoint — accepts POST body {@code { "contacts": [...] }}. */
+    public const SYNC_CONTACTS_URL = self::API_BASE_URL.'/sync/contacts';
+
     /**
      * @deprecated segment lifecycle rows use {@see self::EVENT_NOTIFY_URL} with root key {@code events}
      */
