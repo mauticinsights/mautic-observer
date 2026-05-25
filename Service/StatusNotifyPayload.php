@@ -12,7 +12,7 @@ namespace MauticPlugin\MauticInsightsBundle\Service;
 final class StatusNotifyPayload
 {
     /**
-     * @return array{mautic-version: string, plugin-version: string, identified-contacts: int, anonymous-contacts: int, sender-email: string, plugin-enabled: bool}
+     * @return array{mautic-version: string, plugin-version: string, identified-contacts: int, anonymous-contacts: int, sender-email: string}
      */
     public static function build(
         string $mauticVersion,
@@ -20,7 +20,6 @@ final class StatusNotifyPayload
         int $identifiedContacts,
         int $anonymousContacts,
         string $senderEmail,
-        bool $pluginEnabled = true,
     ): array {
         return [
             'mautic-version' => $mauticVersion,
@@ -28,7 +27,6 @@ final class StatusNotifyPayload
             'identified-contacts' => max(0, $identifiedContacts),
             'anonymous-contacts' => max(0, $anonymousContacts),
             'sender-email' => $senderEmail,
-            'plugin-enabled' => $pluginEnabled,
         ];
     }
 }
