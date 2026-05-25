@@ -31,7 +31,8 @@ final class BulkSyncService
     public function __construct(
         private Connection $mauticConnection,
         private ResilientEventSender $sender,
-        private InsightsOutboundTokenProvider $outboundTokenProvider,
+        private InsightsPublishedIntegrationFinder $integrationFinder,
+        private InsightsHttpTokenResolver $httpTokenResolver,
         private LoggerInterface $logger,
     ) {
     }
@@ -57,8 +58,17 @@ final class BulkSyncService
      */
     public function syncAll(): int
     {
-        $token = $this->outboundTokenProvider->getToken();
-        if (null === $token) {
+        // Always fresh-resolve the token — InsightsOutboundTokenProvider caches the result once
+        // per request, so it may hold a stale null from before the integration was saved as published.
+        $integration = $this->integrationFinder->findPublished();
+        if (null === $integration) {
+            $this->logger->warning('MauticInsights BulkSync: integration not published — sync skipped.');
+
+            return 0;
+        }
+
+        $token = $this->httpTokenResolver->resolve($integration);
+        if ('' === $token) {
             $this->logger->warning('MauticInsights BulkSync: no outbound token — sync skipped.');
 
             return 0;
