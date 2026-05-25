@@ -109,17 +109,17 @@ final class BulkSyncService
     private function syncSegments(string $token, string $syncId): int
     {
         $ts = $this->nowUtcString();
-        $offset = 0;
+        $lastId = 0;
         $total = 0;
 
         while (true) {
             $rows = $this->mauticConnection->fetchAllAssociative(
                 'SELECT id, name, alias, public_name, is_published, date_added, date_modified
                  FROM lead_lists
-                 WHERE is_global = 1
+                 WHERE is_global = 1 AND id > ?
                  ORDER BY id
-                 LIMIT ? OFFSET ?',
-                [self::PAGE_SIZE, $offset],
+                 LIMIT ?',
+                [$lastId, self::PAGE_SIZE],
                 [ParameterType::INTEGER, ParameterType::INTEGER],
             );
 
@@ -131,6 +131,7 @@ final class BulkSyncService
             foreach ($rows as $row) {
                 $sid = (int) $row['id'];
                 $this->syncedSegmentIds[] = $sid;
+                $lastId = $sid;
                 $events[] = [
                     'event' => 'mautic.lead_list_post_save',
                     'ts' => $ts,
@@ -146,7 +147,6 @@ final class BulkSyncService
             }
 
             $total += $this->sendEventChunks($token, $syncId, $events, 'segments');
-            $offset += self::PAGE_SIZE;
 
             if (\count($rows) < self::PAGE_SIZE) {
                 break;
@@ -163,7 +163,7 @@ final class BulkSyncService
     private function syncEmails(string $token, string $syncId): int
     {
         $ts = $this->nowUtcString();
-        $offset = 0;
+        $lastId = 0;
         $total = 0;
 
         while (true) {
@@ -171,10 +171,10 @@ final class BulkSyncService
                 'SELECT id, name, subject, from_address, from_name, is_published, email_type,
                         date_added, date_modified
                  FROM emails
-                 WHERE variant_parent_id IS NULL
+                 WHERE variant_parent_id IS NULL AND id > ?
                  ORDER BY id
-                 LIMIT ? OFFSET ?',
-                [self::PAGE_SIZE, $offset],
+                 LIMIT ?',
+                [$lastId, self::PAGE_SIZE],
                 [ParameterType::INTEGER, ParameterType::INTEGER],
             );
 
@@ -186,6 +186,7 @@ final class BulkSyncService
             foreach ($rows as $row) {
                 $eid = (int) $row['id'];
                 $this->syncedEmailIds[] = $eid;
+                $lastId = $eid;
                 $events[] = [
                     'event' => 'mautic.email_post_save',
                     'ts' => $ts,
@@ -203,7 +204,6 @@ final class BulkSyncService
             }
 
             $total += $this->sendEventChunks($token, $syncId, $events, 'emails');
-            $offset += self::PAGE_SIZE;
 
             if (\count($rows) < self::PAGE_SIZE) {
                 break;
@@ -220,19 +220,21 @@ final class BulkSyncService
     private function syncCampaigns(string $token, string $syncId): int
     {
         $ts = $this->nowUtcString();
-        $offset = 0;
+        $lastId = 0;
         $total = 0;
 
         while (true) {
             $ids = $this->mauticConnection->fetchFirstColumn(
-                'SELECT id FROM campaigns ORDER BY id LIMIT ? OFFSET ?',
-                [self::PAGE_SIZE, $offset],
+                'SELECT id FROM campaigns WHERE id > ? ORDER BY id LIMIT ?',
+                [$lastId, self::PAGE_SIZE],
                 [ParameterType::INTEGER, ParameterType::INTEGER],
             );
 
             if ([] === $ids) {
                 break;
             }
+
+            $lastId = (int) end($ids);
 
             $campaignRows = $this->mauticConnection->fetchAllAssociative(
                 'SELECT id, name, is_published FROM campaigns WHERE id IN ('.implode(',', array_fill(0, \count($ids), '?')).')',
@@ -259,7 +261,6 @@ final class BulkSyncService
             }
 
             $total += $this->sendEventChunks($token, $syncId, $events, 'campaigns');
-            $offset += self::PAGE_SIZE;
 
             if (\count($ids) < self::PAGE_SIZE) {
                 break;
@@ -344,7 +345,7 @@ final class BulkSyncService
     private function syncContacts(string $token, string $syncId): int
     {
         $ts = $this->nowUtcString();
-        $offset = 0;
+        $lastId = 0;
         $total = 0;
 
         while (true) {
@@ -352,10 +353,10 @@ final class BulkSyncService
                 'SELECT l.id, l.email, l.firstname, l.lastname, l.company, l.phone, l.points,
                         l.date_identified
                  FROM leads l
-                 WHERE l.is_published = 1 AND l.date_identified IS NOT NULL
+                 WHERE l.is_published = 1 AND l.date_identified IS NOT NULL AND l.id > ?
                  ORDER BY l.id
-                 LIMIT ? OFFSET ?',
-                [self::PAGE_SIZE, $offset],
+                 LIMIT ?',
+                [$lastId, self::PAGE_SIZE],
                 [ParameterType::INTEGER, ParameterType::INTEGER],
             );
 
@@ -369,6 +370,7 @@ final class BulkSyncService
             $events = [];
             foreach ($leads as $lead) {
                 $cid = (int) $lead['id'];
+                $lastId = $cid;
                 $props = ['operation' => 'sync'];
                 if (null !== $lead['email'] && '' !== $lead['email']) {
                     $props['email'] = $lead['email'];
@@ -399,7 +401,6 @@ final class BulkSyncService
             }
 
             $total += $this->sendEventChunks($token, $syncId, $events, 'contacts');
-            $offset += self::PAGE_SIZE;
 
             if (\count($leads) < self::PAGE_SIZE) {
                 break;
