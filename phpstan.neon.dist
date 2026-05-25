@@ -32,3 +32,8 @@ parameters:
         -
             message: '#Call to an undefined method Mautic\\UserBundle\\Entity\\User::getLocale\(\)#'
             path: Service/InsightsPluginHealthProvider.php
+        # createMock() returns unresolvable type when mocking classes with Doctrine/Symfony deps
+        # not covered by stubs (BulkSyncService → Connection, Command, HttpKernelInterface).
+        -
+            message: '#createMock\(\) contains unresolvable type#'
+            path: Tests/EventSubscriber/BulkSyncOnEnableSubscriberFunctionalTest.php
