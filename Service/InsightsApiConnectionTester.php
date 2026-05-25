@@ -55,6 +55,7 @@ final class InsightsApiConnectionTester
                     $this->leadCountsForStatus->countIdentified(),
                     $this->leadCountsForStatus->countAnonymous(),
                     (string) $this->coreParametersHelper->get('mailer_from_email'),
+                    true,
                 ),
                 'timeout' => 15,
             ]);

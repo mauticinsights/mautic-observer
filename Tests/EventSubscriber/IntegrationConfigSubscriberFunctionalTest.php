@@ -116,6 +116,7 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
         $this->assertIsArray($body);
         $this->assertSame(8, $body['identified-contacts']);
         $this->assertSame(3, $body['anonymous-contacts']);
+        $this->assertStatusBodyHasPluginEnabled($body, true);
     }
 
     public function testSuccessfulPluginsReloadCommandSendsStatusOnConsoleTerminate(): void
@@ -141,6 +142,8 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
         ));
 
         $this->assertCount(1, $captured, 'mautic:plugins:reload must POST /api/status on console.terminate');
+        $body = json_decode($captured[0]['options']['body'] ?? '', true, 512, JSON_THROW_ON_ERROR);
+        $this->assertStatusBodyHasPluginEnabled($body, true);
     }
 
     public function testPluginsReloadCommandSkipsStatusWhenExitCodeNonZero(): void
@@ -226,10 +229,11 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
 
         $body = json_decode($captured[0]['options']['body'] ?? '', true, 512, JSON_THROW_ON_ERROR);
         $this->assertSame(
-            StatusNotifyPayload::build('5.2.0', InsightsPluginVersion::get(), 42, 9, 'from@example.com'),
+            StatusNotifyPayload::build('5.2.0', InsightsPluginVersion::get(), 42, 9, 'from@example.com', true),
             $body,
             $triggerDescription
         );
+        $this->assertStatusBodyHasPluginEnabled($body, true, $triggerDescription);
     }
 
     /** @return array<string, array{string, callable}> */
@@ -358,7 +362,7 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
         $this->assertCount(0, $captured, 'Must not POST when token is empty');
     }
 
-    public function testSkipsWhenIntegrationIsUnpublished(): void
+    public function testSendsWhenIntegrationIsUnpublishedWithPluginEnabledFalse(): void
     {
         $captured = [];
         $integration = new Integration(false, [], InsightsApiConfig::NAME, [
@@ -375,7 +379,9 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
         $subscriber->queueStatusNotify(new ConfigSaveEvent($integration));
         $subscriber->sendQueuedStatusNotify($this->makeTerminateEvent());
 
-        $this->assertCount(0, $captured, 'Must not POST when integration is not published');
+        $this->assertCount(1, $captured, 'Must POST when integration is unpublished so Insights can record plugin-enabled=false');
+        $body = json_decode($captured[0]['options']['body'] ?? '', true, 512, JSON_THROW_ON_ERROR);
+        $this->assertStatusBodyHasPluginEnabled($body, false);
     }
 
     public function testSkipsWhenIntegrationNameDoesNotMatch(): void
@@ -506,5 +512,15 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
             Request::create('/'),
             new Response(),
         );
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    private function assertStatusBodyHasPluginEnabled(array $body, bool $expected, string $context = ''): void
+    {
+        $suffix = '' !== $context ? " ($context)" : '';
+        $this->assertArrayHasKey('plugin-enabled', $body, 'Status payload must include plugin-enabled'.$suffix);
+        $this->assertSame($expected, $body['plugin-enabled'], 'plugin-enabled value'.$suffix);
     }
 }

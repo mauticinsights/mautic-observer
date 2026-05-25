@@ -19,6 +19,30 @@ final class StatusNotifyPayloadTest extends TestCase
             'identified-contacts' => 0,
             'anonymous-contacts' => 0,
             'sender-email' => 'from@example.org',
+            'plugin-enabled' => true,
         ], $payload);
+    }
+
+    public function testBuildIncludesPluginEnabledFalseWhenRequested(): void
+    {
+        $payload = StatusNotifyPayload::build('5.0.0', '2.1.0', 1, 2, 'from@example.org', false);
+
+        $this->assertFalse($payload['plugin-enabled']);
+    }
+
+    public function testBuildAlwaysIncludesPluginEnabledWithExpectedKeys(): void
+    {
+        $payload = StatusNotifyPayload::build('5.0.0', '2.1.0', 1, 2, 'from@example.org', true);
+
+        $this->assertSame([
+            'mautic-version',
+            'plugin-version',
+            'identified-contacts',
+            'anonymous-contacts',
+            'sender-email',
+            'plugin-enabled',
+        ], array_keys($payload));
+        $this->assertIsBool($payload['plugin-enabled']);
+        $this->assertTrue($payload['plugin-enabled']);
     }
 }

@@ -57,7 +57,7 @@ class IntegrationConfigSubscriber implements EventSubscriberInterface
         'mautic:plugins:update',
     ];
 
-    /** @var array{token: string, version: string, senderEmail?: string}|null */
+    /** @var array{token: string, version: string, senderEmail?: string, pluginEnabled: bool}|null */
     private ?array $pendingStatusNotify = null;
 
     private InsightsApiSendGate $insightsApiSendGate;
@@ -205,7 +205,8 @@ class IntegrationConfigSubscriber implements EventSubscriberInterface
                     InsightsPluginVersion::get(),
                     $identified,
                     $anonymous,
-                    $senderEmail
+                    $senderEmail,
+                    $pending['pluginEnabled'],
                 ),
                 'timeout' => 15,
             ]);
@@ -251,10 +252,6 @@ class IntegrationConfigSubscriber implements EventSubscriberInterface
      */
     private function queueStatusNotifyForIntegration(Integration $integration, ?string $senderEmailOverride): void
     {
-        if (!$integration->getIsPublished()) {
-            return;
-        }
-
         $token = $this->httpTokenResolver->resolve($integration);
 
         if ('' === $token) {
@@ -264,6 +261,7 @@ class IntegrationConfigSubscriber implements EventSubscriberInterface
         $pending = [
             'token' => $token,
             'version' => (string) $this->appVersion->getVersion(),
+            'pluginEnabled' => $integration->getIsPublished(),
         ];
 
         if (null !== $senderEmailOverride) {
