@@ -7,7 +7,7 @@ namespace MauticPlugin\MauticInsightsBundle\Service;
 use Doctrine\ORM\EntityManagerInterface;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
 use Psr\Log\LoggerInterface;
-use Symfony\Component\Uid\Uuid;
+use Throwable;
 
 /**
  * Manages the persistent sync session ID stored in {@see InsightsApiConfig::FEATURE_SYNC_ID}
@@ -25,9 +25,9 @@ final class SyncSessionManager
     private bool $resolved = false;
 
     public function __construct(
-        private readonly InsightsPublishedIntegrationFinder $integrationFinder,
-        private readonly EntityManagerInterface $entityManager,
-        private readonly ?LoggerInterface $logger = null,
+        private InsightsPublishedIntegrationFinder $integrationFinder,
+        private EntityManagerInterface $entityManager,
+        private ?LoggerInterface $logger = null,
     ) {
     }
 
@@ -46,7 +46,7 @@ final class SyncSessionManager
             return null;
         }
 
-        $settings = $integration->getFeatureSettings() ?? [];
+        $settings = $integration->getFeatureSettings();
         $id = $settings[InsightsApiConfig::FEATURE_SYNC_ID] ?? null;
         if (\is_string($id) && '' !== $id) {
             $this->cachedSyncId = $id;
@@ -63,17 +63,17 @@ final class SyncSessionManager
      */
     public function createNewSession(): string
     {
-        $syncId = Uuid::v4()->toRfc4122();
+        $syncId = $this->generateUuidV4();
 
         $integration = $this->integrationFinder->findPublished();
         if (null !== $integration) {
             try {
-                $settings = $integration->getFeatureSettings() ?? [];
+                $settings = $integration->getFeatureSettings();
                 $settings[InsightsApiConfig::FEATURE_SYNC_ID] = $syncId;
                 $integration->setFeatureSettings($settings);
                 $this->entityManager->persist($integration);
                 $this->entityManager->flush();
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 $this->logger?->error(
                     'MauticInsights SyncSessionManager: failed to persist sync_id — continuing with in-memory value.',
                     ['exception' => $e->getMessage()],
@@ -86,5 +86,14 @@ final class SyncSessionManager
         $this->resolved = true;
 
         return $syncId;
+    }
+
+    private function generateUuidV4(): string
+    {
+        $data = random_bytes(16);
+        $data[6] = \chr(\ord($data[6]) & 0x0F | 0x40);
+        $data[8] = \chr(\ord($data[8]) & 0x3F | 0x80);
+
+        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
     }
 }

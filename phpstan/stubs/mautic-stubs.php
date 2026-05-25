@@ -137,6 +137,13 @@ class Integration
         return [];
     }
 
+    /**
+     * @param array<string, mixed> $featureSettings
+     */
+    public function setFeatureSettings(array $featureSettings): void
+    {
+    }
+
     public function getIsPublished(): bool
     {
         return false;
