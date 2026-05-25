@@ -112,19 +112,31 @@ final class BulkSyncOnEnableSubscriber implements EventSubscriberInterface
         $wasPublished = $this->readPublishedState();
         $this->writePublishedState($isNowPublished);
 
+        $this->logger->info('MauticInsights BulkSync: config save event received.', [
+            'is_now_published' => $isNowPublished,
+            'was_published' => $wasPublished,
+        ]);
+
         if (!$isNowPublished) {
+            $this->logger->info('MauticInsights BulkSync: plugin disabled, skipping sync.');
+
             return;
         }
 
         if ($wasPublished) {
+            $this->logger->info('MauticInsights BulkSync: already was published, skipping sync.');
+
             return;
         }
 
         $token = $this->httpTokenResolver->resolve($integration);
         if ('' === $token) {
+            $this->logger->warning('MauticInsights BulkSync: no token found, cannot queue sync.');
+
             return;
         }
 
+        $this->logger->info('MauticInsights BulkSync: queued after false→true publish transition.');
         $this->syncQueued = true;
     }
 
@@ -149,14 +161,18 @@ final class BulkSyncOnEnableSubscriber implements EventSubscriberInterface
             return false;
         }
 
-        $path = $this->dataDir.'/'.self::STATE_FILE;
-        if (!is_file($path)) {
+        try {
+            $path = $this->dataDir.'/'.self::STATE_FILE;
+            if (!is_file($path)) {
+                return false;
+            }
+
+            $data = json_decode((string) file_get_contents($path), true);
+
+            return \is_array($data) && isset($data['is_published']) && (bool) $data['is_published'];
+        } catch (Throwable) {
             return false;
         }
-
-        $data = json_decode((string) file_get_contents($path), true);
-
-        return \is_array($data) && isset($data['is_published']) && (bool) $data['is_published'];
     }
 
     private function writePublishedState(bool $isPublished): void
@@ -165,14 +181,17 @@ final class BulkSyncOnEnableSubscriber implements EventSubscriberInterface
             return;
         }
 
-        if (!is_dir($this->dataDir)) {
-            mkdir($this->dataDir, 0755, true);
-        }
+        try {
+            if (!is_dir($this->dataDir)) {
+                mkdir($this->dataDir, 0755, true);
+            }
 
-        file_put_contents(
-            $this->dataDir.'/'.self::STATE_FILE,
-            json_encode(['is_published' => $isPublished], JSON_THROW_ON_ERROR),
-        );
+            file_put_contents(
+                $this->dataDir.'/'.self::STATE_FILE,
+                json_encode(['is_published' => $isPublished]),
+            );
+        } catch (Throwable) {
+        }
     }
 
     private function runQueuedSync(): void

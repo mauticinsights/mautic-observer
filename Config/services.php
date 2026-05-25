@@ -100,6 +100,5 @@ return function (ContainerConfigurator $configurator): void {
         ->arg('$dataDir', '%kernel.project_dir%/var/mauticinsights-buffer');
 
     $services->set(BulkSyncOnEnableSubscriber::class)
-        ->arg('$dataDir', '%kernel.project_dir%/var/mauticinsights-buffer')
-        ->tag('kernel.event_subscriber');
+        ->arg('$dataDir', '%kernel.project_dir%/var/mauticinsights-buffer');
 };
