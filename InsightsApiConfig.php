@@ -49,6 +49,12 @@ final class InsightsApiConfig
     public const SYNC_CONTACTS_URL = self::API_BASE_URL.'/sync/contacts';
 
     /**
+     * Reconcile endpoint — called once after a full sync run with the complete set of IDs
+     * present in Mautic. The app soft-deletes anything absent from the provided ID sets.
+     */
+    public const SYNC_RECONCILE_URL = self::API_BASE_URL.'/sync/reconcile';
+
+    /**
      * @deprecated segment lifecycle rows use {@see self::EVENT_NOTIFY_URL} with root key {@code events}
      */
     public const SEGMENT_NOTIFY_URL = self::API_BASE_URL.'/segment';

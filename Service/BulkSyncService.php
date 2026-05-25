@@ -36,8 +36,26 @@ final class BulkSyncService
     ) {
     }
 
+    /** @var list<int> */
+    private array $syncedSegmentIds = [];
+
+    /** @var list<int> */
+    private array $syncedEmailIds = [];
+
+    /** @var list<int> */
+    private array $syncedCampaignIds = [];
+
+    /** @var list<int> */
+    private array $syncedContactIds = [];
+
     /**
-     * Runs the full sync in order: segments → emails → campaigns → contacts.
+     * Runs the full sync in order: segments → emails → campaigns → contacts → reconcile.
+     *
+     * Reconcile is called once at the end with the complete set of IDs seen during the sync.
+     * The app soft-deletes entities that exist in its tables but are absent from these ID sets —
+     * resolving the gap where entities deleted while the plugin was disabled are never reported
+     * via normal {@code *_post_delete} events.
+     *
      * Returns the total number of entities dispatched across all types.
      */
     public function syncAll(): int
@@ -49,11 +67,18 @@ final class BulkSyncService
             return 0;
         }
 
+        $this->syncedSegmentIds = [];
+        $this->syncedEmailIds = [];
+        $this->syncedCampaignIds = [];
+        $this->syncedContactIds = [];
+
         $total = 0;
         $total += $this->syncSegments($token);
         $total += $this->syncEmails($token);
         $total += $this->syncCampaigns($token);
         $total += $this->syncContacts($token);
+
+        $this->sendReconcile($token);
 
         $this->logger->info('MauticInsights BulkSync: completed.', ['total_entities' => $total]);
 
@@ -86,10 +111,12 @@ final class BulkSyncService
 
             $events = [];
             foreach ($rows as $row) {
+                $sid = (int) $row['id'];
+                $this->syncedSegmentIds[] = $sid;
                 $events[] = [
                     'event' => 'mautic.lead_list_post_save',
                     'ts' => $ts,
-                    'segment_id' => (int) $row['id'],
+                    'segment_id' => $sid,
                     'properties' => [
                         'name' => $row['name'] ?? '',
                         'alias' => $row['alias'] ?? '',
@@ -138,10 +165,12 @@ final class BulkSyncService
 
             $events = [];
             foreach ($rows as $row) {
+                $eid = (int) $row['id'];
+                $this->syncedEmailIds[] = $eid;
                 $events[] = [
                     'event' => 'mautic.email_post_save',
                     'ts' => $ts,
-                    'email_id' => (int) $row['id'],
+                    'email_id' => $eid,
                     'properties' => [
                         'name' => $row['name'] ?? '',
                         'subject' => $row['subject'] ?? null,
@@ -195,6 +224,7 @@ final class BulkSyncService
             $events = [];
             foreach ($campaignRows as $row) {
                 $cid = (int) $row['id'];
+                $this->syncedCampaignIds[] = $cid;
                 $events[] = [
                     'event' => 'mautic.campaign_post_save',
                     'ts' => $ts,
@@ -222,7 +252,7 @@ final class BulkSyncService
     /**
      * @param list<int|string> $campaignIds
      *
-     * @return array<int, list<array<string, mixed>>>  keyed by campaign_id
+     * @return array<int, list<array<string, mixed>>> keyed by campaign_id
      */
     private function fetchCampaignGraphEvents(array $campaignIds): array
     {
@@ -313,6 +343,7 @@ final class BulkSyncService
             $contacts = [];
             foreach ($leads as $lead) {
                 $cid = (int) $lead['id'];
+                $this->syncedContactIds[] = $cid;
                 $props = [];
                 if (null !== $lead['email'] && '' !== $lead['email']) {
                     $props['email'] = $lead['email'];
@@ -355,7 +386,7 @@ final class BulkSyncService
     /**
      * @param list<int|string> $leadIds
      *
-     * @return array<int, list<int>>  keyed by contact_id
+     * @return array<int, list<int>> keyed by contact_id
      */
     private function fetchContactSegmentIds(array $leadIds): array
     {
@@ -377,6 +408,41 @@ final class BulkSyncService
         }
 
         return $result;
+    }
+
+    // -------------------------------------------------------------------------
+    // Reconcile
+    // -------------------------------------------------------------------------
+
+    /**
+     * Sends the complete set of IDs encountered during the sync run so the app can
+     * soft-delete entities that are absent from Mautic (deleted while plugin was disabled).
+     */
+    private function sendReconcile(string $token): void
+    {
+        $payload = [];
+
+        if ([] !== $this->syncedCampaignIds) {
+            $payload['campaigns'] = array_values(array_unique($this->syncedCampaignIds));
+        }
+        if ([] !== $this->syncedSegmentIds) {
+            $payload['segments'] = array_values(array_unique($this->syncedSegmentIds));
+        }
+        if ([] !== $this->syncedEmailIds) {
+            $payload['emails'] = array_values(array_unique($this->syncedEmailIds));
+        }
+        if ([] !== $this->syncedContactIds) {
+            $payload['contacts'] = array_values(array_unique($this->syncedContactIds));
+        }
+
+        if ([] === $payload) {
+            return;
+        }
+
+        $ok = $this->sender->send(InsightsApiConfig::SYNC_RECONCILE_URL, $token, $payload);
+        if (!$ok) {
+            $this->logger->error('MauticInsights BulkSync: reconcile request failed — stale entities may remain in the app.');
+        }
     }
 
     // -------------------------------------------------------------------------
