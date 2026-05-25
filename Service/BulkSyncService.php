@@ -7,6 +7,7 @@ namespace MauticPlugin\MauticInsightsBundle\Service;
 use DateTimeImmutable;
 use DateTimeZone;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\ParameterType;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
 use Psr\Log\LoggerInterface;
 
@@ -119,6 +120,7 @@ final class BulkSyncService
                  ORDER BY id
                  LIMIT ? OFFSET ?',
                 [self::PAGE_SIZE, $offset],
+                [ParameterType::INTEGER, ParameterType::INTEGER],
             );
 
             if ([] === $rows) {
@@ -173,6 +175,7 @@ final class BulkSyncService
                  ORDER BY id
                  LIMIT ? OFFSET ?',
                 [self::PAGE_SIZE, $offset],
+                [ParameterType::INTEGER, ParameterType::INTEGER],
             );
 
             if ([] === $rows) {
@@ -224,6 +227,7 @@ final class BulkSyncService
             $ids = $this->mauticConnection->fetchFirstColumn(
                 'SELECT id FROM campaigns ORDER BY id LIMIT ? OFFSET ?',
                 [self::PAGE_SIZE, $offset],
+                [ParameterType::INTEGER, ParameterType::INTEGER],
             );
 
             if ([] === $ids) {
@@ -352,6 +356,7 @@ final class BulkSyncService
                  ORDER BY l.id
                  LIMIT ? OFFSET ?',
                 [self::PAGE_SIZE, $offset],
+                [ParameterType::INTEGER, ParameterType::INTEGER],
             );
 
             if ([] === $leads) {
