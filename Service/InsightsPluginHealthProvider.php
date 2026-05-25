@@ -127,12 +127,8 @@ final class InsightsPluginHealthProvider
 
         if (\extension_loaded('intl')) {
             try {
-                $locale = $this->localeAware?->getLocale() ?? Locale::getDefault();
-                if ('' === trim($locale)) {
-                    $locale = 'en';
-                }
                 $formatter = new IntlDateFormatter(
-                    $locale,
+                    $this->resolveDisplayLocale(),
                     IntlDateFormatter::MEDIUM,
                     IntlDateFormatter::SHORT,
                     $userTz,
@@ -164,6 +160,32 @@ final class InsightsPluginHealthProvider
         }
 
         return 'UTC';
+    }
+
+    private function resolveDisplayLocale(): string
+    {
+        // 1. Mautic user's own locale preference (stored in their profile).
+        try {
+            $userLocale = (string) ($this->userHelper?->getUser()?->getLocale() ?? '');
+            if ('' !== trim($userLocale)) {
+                return $userLocale;
+            }
+        } catch (Throwable) {
+        }
+
+        // 2. Symfony request locale (Accept-Language / session).
+        try {
+            $requestLocale = (string) ($this->localeAware?->getLocale() ?? '');
+            if ('' !== trim($requestLocale)) {
+                return $requestLocale;
+            }
+        } catch (Throwable) {
+        }
+
+        // 3. PHP default locale or safe fallback.
+        $default = Locale::getDefault();
+
+        return '' !== trim($default) ? $default : 'en';
     }
 
     /**

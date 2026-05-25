@@ -206,6 +206,11 @@ class User
     {
         return '';
     }
+
+    public function getLocale(): string
+    {
+        return '';
+    }
 }
 
 namespace Mautic\CoreBundle\Helper;
