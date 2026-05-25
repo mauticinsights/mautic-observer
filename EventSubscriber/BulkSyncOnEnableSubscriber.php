@@ -24,8 +24,8 @@ use Symfony\Component\HttpKernel\KernelEvents;
 use Throwable;
 
 /**
- * Triggers a bulk sync of all Mautic entities (segments, emails, campaigns, contacts) only when
- * the plugin transitions from disabled → enabled (is_published: false → true).
+ * Triggers a bulk sync of all Mautic entities (segments, emails, campaigns, contacts) after the
+ * plugin integration is saved while published, or after a plugin install/update.
  *
  * The sync is queued on the event and executed on {@code kernel.terminate} /
  * {@code console.terminate} so the HTTP response to the admin is not delayed.
@@ -35,8 +35,6 @@ use Throwable;
  */
 final class BulkSyncOnEnableSubscriber implements EventSubscriberInterface
 {
-    private const STATE_FILE = 'plugin_published_state.json';
-
     private bool $syncQueued = false;
 
     public function __construct(
@@ -44,7 +42,6 @@ final class BulkSyncOnEnableSubscriber implements EventSubscriberInterface
         private InsightsPublishedIntegrationFinder $integrationFinder,
         private InsightsHttpTokenResolver $httpTokenResolver,
         private LoggerInterface $logger,
-        private string $dataDir = '',
     ) {
     }
 
@@ -108,35 +105,15 @@ final class BulkSyncOnEnableSubscriber implements EventSubscriberInterface
             return;
         }
 
-        $isNowPublished = $integration->getIsPublished();
-        $wasPublished = $this->readPublishedState();
-        $this->writePublishedState($isNowPublished);
-
-        $this->logger->info('MauticInsights BulkSync: config save event received.', [
-            'is_now_published' => $isNowPublished,
-            'was_published' => $wasPublished,
-        ]);
-
-        if (!$isNowPublished) {
-            $this->logger->info('MauticInsights BulkSync: plugin disabled, skipping sync.');
-
-            return;
-        }
-
-        if ($wasPublished) {
-            $this->logger->info('MauticInsights BulkSync: already was published, skipping sync.');
-
+        if (!$integration->getIsPublished()) {
             return;
         }
 
         $token = $this->httpTokenResolver->resolve($integration);
         if ('' === $token) {
-            $this->logger->warning('MauticInsights BulkSync: no token found, cannot queue sync.');
-
             return;
         }
 
-        $this->logger->info('MauticInsights BulkSync: queued after false→true publish transition.');
         $this->syncQueued = true;
     }
 
@@ -153,45 +130,6 @@ final class BulkSyncOnEnableSubscriber implements EventSubscriberInterface
         }
 
         $this->syncQueued = true;
-    }
-
-    private function readPublishedState(): bool
-    {
-        if ('' === $this->dataDir) {
-            return false;
-        }
-
-        try {
-            $path = $this->dataDir.'/'.self::STATE_FILE;
-            if (!is_file($path)) {
-                return false;
-            }
-
-            $data = json_decode((string) file_get_contents($path), true);
-
-            return \is_array($data) && isset($data['is_published']) && (bool) $data['is_published'];
-        } catch (Throwable) {
-            return false;
-        }
-    }
-
-    private function writePublishedState(bool $isPublished): void
-    {
-        if ('' === $this->dataDir) {
-            return;
-        }
-
-        try {
-            if (!is_dir($this->dataDir)) {
-                mkdir($this->dataDir, 0755, true);
-            }
-
-            file_put_contents(
-                $this->dataDir.'/'.self::STATE_FILE,
-                json_encode(['is_published' => $isPublished]),
-            );
-        } catch (Throwable) {
-        }
     }
 
     private function runQueuedSync(): void
