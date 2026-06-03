@@ -58,4 +58,12 @@ final class Integration
     {
         return $this->apiKeys;
     }
+
+    /**
+     * @param array<string, mixed> $apiKeys
+     */
+    public function setApiKeys(array $apiKeys): void
+    {
+        $this->apiKeys = $apiKeys;
+    }
 }
