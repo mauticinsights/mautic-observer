@@ -58,7 +58,7 @@ final class SafeEncryptionServiceTest extends TestCase
         $this->assertSame(['http_token' => null], $result);
     }
 
-    public function testDecryptPlainTextWithoutPipeSeparatorReturnsFalse(): void
+    public function testDecryptPlainTextWithoutPipeSeparatorReturnsValueUnchanged(): void
     {
         // Plain-text token after IntegrationsHelper restores it — no '|' separator.
         $helper = $this->createMock(EncryptionHelper::class);
@@ -67,17 +67,17 @@ final class SafeEncryptionServiceTest extends TestCase
         $service = new SafeEncryptionService($helper);
         $result = $service->decrypt(['http_token' => 'plain-token-no-pipe']);
 
-        $this->assertSame(['http_token' => false], $result);
+        $this->assertSame(['http_token' => 'plain-token-no-pipe'], $result);
     }
 
-    public function testDecryptScalarPlainTextReturnsFalse(): void
+    public function testDecryptScalarPlainTextReturnsValueUnchanged(): void
     {
         $helper = $this->createMock(EncryptionHelper::class);
         $helper->expects($this->never())->method('decrypt');
 
         $service = new SafeEncryptionService($helper);
 
-        $this->assertFalse($service->decrypt('plain-text-no-pipe'));
+        $this->assertSame('plain-text-no-pipe', $service->decrypt('plain-text-no-pipe'));
     }
 
     public function testDecryptScalarEmptyStringReturnsFalse(): void
@@ -184,13 +184,40 @@ final class SafeEncryptionServiceTest extends TestCase
             'http_token' => 'decrypted',
             'empty_field' => '',
             'null_field' => null,
-            'plain_field' => false,
+            'plain_field' => 'nopipe',
         ], $result);
     }
 
     // ──────────────────────────────────────────────────────────────
-    // encrypt() — delegates to EncryptionHelper unchanged
+    // encrypt()
     // ──────────────────────────────────────────────────────────────
+
+    public function testEncryptSkipsAlreadyEncryptedValue(): void
+    {
+        $helper = $this->createMock(EncryptionHelper::class);
+        $helper->expects($this->never())->method('encrypt');
+
+        $service = new SafeEncryptionService($helper);
+        $result = $service->encrypt(['http_token' => 'cipher|iv']);
+
+        $this->assertSame(['http_token' => 'cipher|iv'], $result);
+    }
+
+    public function testEncryptNewPlainTokenDelegatesToHelper(): void
+    {
+        $helper = $this->createMock(EncryptionHelper::class);
+        $helper->expects($this->once())
+            ->method('encrypt')
+            ->with('brand-new-token')
+            ->willReturn('encrypted|blob');
+
+        $service = new SafeEncryptionService($helper);
+
+        $this->assertSame(
+            ['http_token' => 'encrypted|blob'],
+            $service->encrypt(['http_token' => 'brand-new-token']),
+        );
+    }
 
     public function testEncryptScalarDelegatesToHelper(): void
     {

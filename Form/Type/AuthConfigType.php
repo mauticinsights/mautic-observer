@@ -4,16 +4,14 @@ declare(strict_types=1);
 
 namespace MauticPlugin\MauticInsightsBundle\Form\Type;
 
-use Mautic\PluginBundle\Entity\Integration;
+use MauticPlugin\MauticInsightsBundle\Form\Validation\HttpTokenConstraintFactory;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
 use MauticPlugin\MauticInsightsBundle\Integration\MauticInsightsIntegration;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\PasswordType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
-use Symfony\Component\Validator\Constraints\Callback;
 use Symfony\Component\Validator\Constraints\Length;
-use Symfony\Component\Validator\Context\ExecutionContextInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
@@ -67,34 +65,10 @@ class AuthConfigType extends AbstractType
                 'always_empty' => true,
                 'translation_domain' => false,
                 'constraints' => [
-                    new Callback($this->buildTokenRequiredCallback($hasExistingToken)),
+                    HttpTokenConstraintFactory::tokenRequired($hasExistingToken),
                     new Length(max: 4096),
                 ],
             ]
-        );
-    }
-
-    /**
-     * Require a token when the integration is published and none is stored yet.
-     * When a token already exists, an empty password field means “keep current value”.
-     */
-    private function buildTokenRequiredCallback(bool $hasExistingToken): Callback
-    {
-        return new Callback(
-            function (mixed $value, ExecutionContextInterface $context) use ($hasExistingToken): void {
-                if ($hasExistingToken && '' === \trim((string) $value)) {
-                    return;
-                }
-
-                $root = $context->getRoot()->getData();
-                if (!$root instanceof Integration || !$root->getIsPublished()) {
-                    return;
-                }
-
-                if ('' === \trim((string) $value)) {
-                    $context->buildViolation('mautic.core.value.required')->addViolation();
-                }
-            }
         );
     }
 

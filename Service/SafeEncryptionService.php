@@ -36,14 +36,15 @@ final class SafeEncryptionService
     public function encrypt(mixed $keys): array|string
     {
         if (!is_array($keys)) {
-            return $this->encryptionHelper->encrypt($keys);
+            return $this->safeEncryptSingle($keys);
         }
 
+        $result = [];
         foreach ($keys as $name => $key) {
-            $keys[$name] = $this->encryptionHelper->encrypt($key);
+            $result[$name] = $this->safeEncryptSingle($key);
         }
 
-        return $keys;
+        return $result;
     }
 
     /**
@@ -72,22 +73,40 @@ final class SafeEncryptionService
         return $result;
     }
 
+    private function safeEncryptSingle(mixed $key): mixed
+    {
+        if (!\is_string($key) || '' === $key) {
+            return $key;
+        }
+
+        // Already stored in Mautic encrypted form — do not double-encrypt.
+        if (str_contains($key, '|')) {
+            return $key;
+        }
+
+        try {
+            return $this->encryptionHelper->encrypt($key);
+        } catch (Throwable) {
+            return $key;
+        }
+    }
+
     private function safeDecryptSingle(string $key, bool $onlyPrimaryCipher): string|false
     {
         if ('' === $key) {
             return false;
         }
 
-        // Mautic encrypts as base64(cipher)|base64(iv). A value without '|' is
-        // either plain text (restored after save) or not yet encrypted.
-        // Passing it to EncryptionHelper::decrypt() would emit a PHP Warning and
-        // throw TypeError on PHP 8.2 — return false (not encrypted) instead.
+        // Plain text (e.g. after saveIntegrationConfiguration restores decrypted keys).
+        // Core EncryptionHelper::decrypt() would warn on missing '|' segment.
         if (!str_contains($key, '|')) {
-            return false;
+            return $key;
         }
 
         try {
-            return $this->encryptionHelper->decrypt($key, $onlyPrimaryCipher);
+            $plain = $this->encryptionHelper->decrypt($key, $onlyPrimaryCipher);
+
+            return (false !== $plain) ? (string) $plain : false;
         } catch (Throwable) {
             return false;
         }
