@@ -1,7 +1,7 @@
 {
     "name": "mauticinsights/mautic-observer",
-    "description": "Mautic Insights — plugin for Mautic 5.x",
-    "version": "1.0.0",
+    "description": "Mautic Insights — plugin for Mautic",
+    "version": "5.0.0",
     "type": "mautic-plugin",
     "license": "proprietary",
     "keywords": [

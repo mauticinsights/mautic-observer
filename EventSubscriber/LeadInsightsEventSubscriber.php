@@ -7,7 +7,9 @@ namespace MauticPlugin\MauticInsightsBundle\EventSubscriber;
 use Mautic\LeadBundle\Entity\Lead;
 use Mautic\LeadBundle\Event\ChannelSubscriptionChange;
 use Mautic\LeadBundle\Event\LeadEvent;
+use Mautic\LeadBundle\Event\LeadMergeEvent;
 use Mautic\LeadBundle\Event\ListChangeEvent;
+use Mautic\LeadBundle\Event\PointsChangeEvent;
 use Mautic\LeadBundle\LeadEvents;
 use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
 use MauticPlugin\MauticInsightsBundle\Buffer\MauticEventBuffer;
@@ -38,10 +40,8 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
             // LEAD_POST_SAVE's ts strictly before the nested LEAD_IDENTIFIED ts, matching Mautic's actual top-level dispatch order.
             LeadEvents::LEAD_POST_SAVE => ['onLeadSave', 255],
             LeadEvents::LEAD_POST_DELETE => ['onLeadDelete', 0],
-            // LEAD_POINTS_CHANGE is intentionally not subscribed – MVP on the Insights side
-            // (funnel + realtime) has no scoring metrics. Re-add with `onPointsChange`
-            // when an MQL threshold dashboard, score velocity, or score-stagnation cohort
-            // feature is introduced.
+            LeadEvents::LEAD_POST_MERGE => ['onLeadMerge', 0],
+            LeadEvents::LEAD_POINTS_CHANGE => ['onPointsChange', 0],
             LeadEvents::LEAD_LIST_CHANGE => ['onListChange', 0],
             LeadEvents::LEAD_IDENTIFIED => ['onLeadIdentified', 0],
             LeadEvents::CHANNEL_SUBSCRIPTION_CHANGED => ['onChannelSubscriptionChanged', 0],
@@ -88,6 +88,47 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
         $this->deferredLeadOutboundQueue->enqueue(
             LeadEvents::LEAD_POST_DELETE,
             $this->contextBuilder->buildPayloadFromLead($lead)
+        );
+    }
+
+    /**
+     * Contact merge — one contact is merged into another.
+     *
+     * {@see \Mautic\LeadBundle\Deduplicate\ContactMerger::merge()} dispatches LEAD_POST_MERGE
+     * after the winner is saved but before the loser is deleted. We emit an event for the
+     * merged-away (loser) contact so the app side can decrement contact counts and soft-delete
+     * the loser's profile. The winner id is passed in {@code properties.survivor_id} for
+     * {@see \App\Service\MauticIngestContactIdForStorage} to record as the storage contact.
+     *
+     * Payload {@code contact_id} = loser id; {@code properties.survivor_id} = winner id.
+     * The app side expects the loser id at top-level {@code contact_id} for
+     * {@see \App\Service\ContactsCountAdjustmentFromIngestEvent} (remove event) and
+     * {@see \App\Service\ContactProfileFromLeadIngest} (soft-delete).
+     */
+    public function onLeadMerge(LeadMergeEvent $event): void
+    {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
+        $loser = $event->getLoser();
+        if (null === $loser || $loser->isAnonymous()) {
+            return;
+        }
+
+        $winner = $event->getVictor();
+        $winnerId = null;
+        if (null !== $winner) {
+            $winnerId = $winner->getId();
+        }
+
+        $payload = $this->mergeLeadProperties($loser, [
+            'survivor_id' => $winnerId,
+        ]);
+
+        $this->deferredLeadOutboundQueue->enqueue(
+            LeadEvents::LEAD_POST_MERGE,
+            $payload
         );
     }
 
@@ -200,6 +241,37 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
         $payload['channel'] = $channel;
 
         $this->eventBuffer->push(LeadEvents::CHANNEL_SUBSCRIPTION_CHANGED, $payload);
+    }
+
+    /**
+     * Score change event — fired when Mautic modifies a contact's points.
+     *
+     * High-frequency: Mautic fires this per Point Action evaluation (email click, page visit, etc.).
+     * We push through realtime {@see MauticEventBuffer} (not deferred) for immediate score velocity
+     * visibility. Payload includes {@code old_points}, {@code new_points}, and {@code delta} so the
+     * app can compute threshold crossings without comparing against snapshots.
+     */
+    public function onPointsChange(PointsChangeEvent $event): void
+    {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
+        $lead = $event->getLead();
+        if ($lead->isAnonymous()) {
+            return;
+        }
+
+        $old = $event->getOldPoints();
+        $new = $event->getNewPoints();
+        $extra = [
+            'old_points' => $old,
+            'new_points' => $new,
+            'delta' => $new - $old,
+        ];
+
+        $payload = $this->mergeLeadProperties($lead, $extra);
+        $this->eventBuffer->push(LeadEvents::LEAD_POINTS_CHANGE, $payload);
     }
 
     private function pushListChangeForLead(ListChangeEvent $event, Lead $lead): void

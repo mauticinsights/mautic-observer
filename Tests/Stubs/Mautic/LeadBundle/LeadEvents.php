@@ -10,6 +10,8 @@ final class LeadEvents
 
     public const LEAD_POST_DELETE = 'mautic.lead_post_delete';
 
+    public const LEAD_POST_MERGE = 'mautic.lead_post_merge';
+
     public const LEAD_POINTS_CHANGE = 'mautic.lead_points_change';
 
     public const LEAD_LIST_CHANGE = 'mautic.lead_list_change';

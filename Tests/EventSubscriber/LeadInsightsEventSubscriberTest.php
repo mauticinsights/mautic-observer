@@ -9,7 +9,9 @@ use Mautic\LeadBundle\Entity\LeadList;
 use Mautic\LeadBundle\Entity\Tag;
 use Mautic\LeadBundle\Event\ChannelSubscriptionChange;
 use Mautic\LeadBundle\Event\LeadEvent;
+use Mautic\LeadBundle\Event\LeadMergeEvent;
 use Mautic\LeadBundle\Event\ListChangeEvent;
+use Mautic\LeadBundle\Event\PointsChangeEvent;
 use Mautic\LeadBundle\LeadEvents;
 use Mautic\LeadBundle\Model\LeadModel;
 use Mautic\PluginBundle\Entity\Integration;
@@ -122,9 +124,8 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         $this->assertArrayHasKey(LeadEvents::CHANNEL_SUBSCRIPTION_CHANGED, $map);
         $this->assertSame(['onChannelSubscriptionChanged', 0], $map[LeadEvents::CHANNEL_SUBSCRIPTION_CHANGED]);
 
-        // LEAD_POINTS_CHANGE is intentionally NOT subscribed – not part of MVP (no scoring
-        // metrics in funnel/realtime dashboards). See LeadInsightsEventSubscriber::getSubscribedEvents().
-        $this->assertArrayNotHasKey(LeadEvents::LEAD_POINTS_CHANGE, $map);
+        $this->assertArrayHasKey(LeadEvents::LEAD_POINTS_CHANGE, $map);
+        $this->assertSame('onPointsChange', $map[LeadEvents::LEAD_POINTS_CHANGE][0]);
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -289,6 +290,121 @@ final class LeadInsightsEventSubscriberTest extends TestCase
     }
 
     // ──────────────────────────────────────────────────────────────
+    // LEAD_POST_MERGE  →  contact merge
+    // ──────────────────────────────────────────────────────────────
+
+    public function testContactMergeRequestBody(): void
+    {
+        [$buffer, $queue, $subscriber] = $this->makeStack([['id' => 5], ['id' => 9]]);
+
+        $loser = $this->makeFullLead();
+        $winner = new Lead();
+        $winner->stubId = 10;
+        $winner->stubEmail = 'winner@example.com';
+
+        $subscriber->onLeadMerge(new LeadMergeEvent($winner, $loser));
+        $queue->flushTo($buffer);
+
+        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
+
+        $this->assertSame([
+            [
+                'event' => LeadEvents::LEAD_POST_MERGE,
+                'channel' => 'contact',
+                'contact_id' => 42,
+                'segment_ids' => [5, 9],
+                'properties' => [
+                    'email' => 'jan.novak@example.com',
+                    'primary_identifier' => 'Jan Novák',
+                    'first_name' => 'Jan',
+                    'last_name' => 'Novák',
+                    'tags' => ['vip', 'newsletter'],
+                    'points' => 42,
+                    'survivor_id' => 10,
+                ],
+            ],
+        ], $rows);
+    }
+
+    public function testMergeLoserIdIsTopLevelContactId(): void
+    {
+        [$buffer, $queue, $subscriber] = $this->makeStack();
+
+        $loser = new Lead();
+        $loser->stubId = 77;
+        $loser->stubEmail = 'loser@example.com';
+        $winner = new Lead();
+        $winner->stubId = 99;
+
+        $subscriber->onLeadMerge(new LeadMergeEvent($winner, $loser));
+        $queue->flushTo($buffer);
+
+        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
+        $this->assertSame(77, $rows[0]['contact_id'], 'contact_id must be the loser (merged-away) contact id');
+        $this->assertSame(99, $rows[0]['properties']['survivor_id'], 'survivor_id must be the winner id');
+        $this->assertSame(LeadEvents::LEAD_POST_MERGE, $rows[0]['event']);
+    }
+
+    public function testAnonymousMergeLoserIsIgnored(): void
+    {
+        [$buffer, $queue, $subscriber] = $this->makeStack();
+
+        $anonLoser = new Lead();
+        $anonLoser->anonymous = true;
+        $anonLoser->stubId = 1;
+        $winner = new Lead();
+        $winner->stubId = 2;
+
+        $subscriber->onLeadMerge(new LeadMergeEvent($winner, $anonLoser));
+        $queue->flushTo($buffer);
+
+        $this->assertSame([], $this->flushBufferAndGetNormalizedEventRows($buffer));
+    }
+
+    public function testMergeLoserWithMinimalPropertiesEmitsEvent(): void
+    {
+        [$buffer, $queue, $subscriber] = $this->makeStack();
+
+        $loser = new Lead();
+        $loser->stubId = 55;
+        $loser->stubEmail = 'minimal@example.com';
+        $winner = new Lead();
+        $winner->stubId = 66;
+
+        $subscriber->onLeadMerge(new LeadMergeEvent($winner, $loser));
+        $queue->flushTo($buffer);
+
+        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
+        $this->assertCount(1, $rows);
+        $this->assertSame(55, $rows[0]['contact_id']);
+        $this->assertSame(LeadEvents::LEAD_POST_MERGE, $rows[0]['event']);
+        $this->assertSame(66, $rows[0]['properties']['survivor_id']);
+        $this->assertArrayHasKey('email', $rows[0]['properties']);
+        $this->assertSame('minimal@example.com', $rows[0]['properties']['email']);
+    }
+
+    public function testMergeWithNullWinnerIdEmitsEventWithoutSurvivorId(): void
+    {
+        [$buffer, $queue, $subscriber] = $this->makeStack();
+
+        $loser = new Lead();
+        $loser->stubId = 77;
+        $loser->stubEmail = 'lonely@example.com';
+        $winner = new Lead();
+
+        $subscriber->onLeadMerge(new LeadMergeEvent($winner, $loser));
+        $queue->flushTo($buffer);
+
+        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
+        $this->assertCount(1, $rows);
+        $this->assertSame(77, $rows[0]['contact_id']);
+        $this->assertSame(LeadEvents::LEAD_POST_MERGE, $rows[0]['event']);
+        // survivor_id is emitted but null when the winner has no id
+        $this->assertArrayHasKey('survivor_id', $rows[0]['properties']);
+        $this->assertNull($rows[0]['properties']['survivor_id']);
+    }
+
+    // ──────────────────────────────────────────────────────────────
     // LEAD_LIST_CHANGE  →  segment change
     // ──────────────────────────────────────────────────────────────
 
@@ -403,6 +519,74 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         $anon->anonymous = true;
 
         $subscriber->onLeadIdentified(new LeadEvent($anon, false));
+
+        $this->assertSame([], $this->flushBufferAndGetNormalizedEventRows($buffer));
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // LEAD_POINTS_CHANGE  →  score delta
+    // ──────────────────────────────────────────────────────────────
+
+    public function testLeadPointsChangeRequestBody(): void
+    {
+        [$buffer, , $subscriber] = $this->makeStack([['id' => 5]]);
+
+        $lead = new Lead();
+        $lead->stubId = 42;
+        $lead->stubEmail = 'score@example.com';
+        $lead->stubFirstname = 'Scorer';
+        $lead->stubPoints = 55;
+
+        $subscriber->onPointsChange(new PointsChangeEvent($lead, 50, 55));
+
+        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
+
+        $this->assertSame([
+            [
+                'event' => LeadEvents::LEAD_POINTS_CHANGE,
+                'channel' => 'contact',
+                'contact_id' => 42,
+                'segment_ids' => [5],
+                'properties' => [
+                    'email' => 'score@example.com',
+                    'first_name' => 'Scorer',
+                    'points' => 55,
+                    'old_points' => 50,
+                    'new_points' => 55,
+                    'delta' => 5,
+                ],
+            ],
+        ], $rows);
+    }
+
+    public function testLeadPointsChangeNegativeDelta(): void
+    {
+        [$buffer, , $subscriber] = $this->makeStack([]);
+
+        $lead = new Lead();
+        $lead->stubId = 77;
+        $lead->stubEmail = 'decay@example.com';
+        $lead->stubPoints = 30;
+
+        $subscriber->onPointsChange(new PointsChangeEvent($lead, 40, 30));
+
+        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame(LeadEvents::LEAD_POINTS_CHANGE, $rows[0]['event']);
+        $this->assertSame(40, $rows[0]['properties']['old_points']);
+        $this->assertSame(30, $rows[0]['properties']['new_points']);
+        $this->assertSame(-10, $rows[0]['properties']['delta']);
+    }
+
+    public function testAnonymousPointsChangeIsIgnored(): void
+    {
+        [$buffer, , $subscriber] = $this->makeStack([]);
+
+        $anon = new Lead();
+        $anon->anonymous = true;
+
+        $subscriber->onPointsChange(new PointsChangeEvent($anon, 0, 10));
 
         $this->assertSame([], $this->flushBufferAndGetNormalizedEventRows($buffer));
     }
