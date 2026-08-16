@@ -21,6 +21,7 @@ use MauticPlugin\MauticInsightsBundle\Service\InsightsOutboundTokenProvider;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPluginLogger;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPluginLoggingFeatureReader;
 use MauticPlugin\MauticInsightsBundle\Service\SafeEncryptionService;
+use MauticPlugin\MauticInsightsBundle\Service\SegmentCheckpointStore;
 use MauticPlugin\MauticInsightsBundle\Service\SyncSessionManager;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 
@@ -96,6 +97,9 @@ return function (ContainerConfigurator $configurator): void {
         ->arg('$mauticEventBuffer', service(MauticEventBuffer::class))
         ->arg('$deferredOutboundEventQueue', service(DeferredOutboundEventQueue::class))
         ->arg('$insightsApiSendGate', service(InsightsApiSendGate::class));
+
+    $services->set(SegmentCheckpointStore::class)
+        ->arg('$dataDir', '%kernel.project_dir%/var/mauticinsights-buffer');
 
     $services->set(InsightsLastApiTelemetry::class)
         ->arg('$dataDir', '%kernel.project_dir%/var/mauticinsights-buffer');

@@ -37,3 +37,9 @@ parameters:
         -
             message: '#createMock\(\) contains unresolvable type#'
             path: Tests/EventSubscriber/BulkSyncOnEnableSubscriberFunctionalTest.php
+        -
+            message: '#createMock\(\) contains unresolvable type#'
+            path: Tests/Command/SegmentReconcileCommandTest.php
+        -
+            message: '#createMock\(\) contains unresolvable type#'
+            path: Tests/Service/SegmentReconcileServiceTest.php

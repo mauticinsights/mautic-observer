@@ -1,10 +1,14 @@
 # Mautic Insights Observer
 
-A plugin for Mautic 5.x that captures key Mautic events and sends them to the Mautic Insights API.
+Observes Mautic contact, email, campaign, form, page and segment events and streams them to the [Mautic Insights](https://packagist.org/packages/mauticinsights/mautic-observer) ingest API.
 
-## What This Plugin Does
+Package: [`mauticinsights/mautic-observer`](https://packagist.org/packages/mauticinsights/mautic-observer) on Packagist.
 
-- sends events to the Mautic Insights
+## What this plugin does
+
+- Listens to key Mautic events (contacts, email, campaigns, forms, page hits, segments)
+- Buffers and sends outbound payloads to the Insights API (`/event`, `/status`)
+- Supports bulk sync on enable, segment reconcile after batch rebuilds, and a Health panel in the plugin UI
 
 ## Requirements
 
@@ -12,54 +16,50 @@ A plugin for Mautic 5.x that captures key Mautic events and sends them to the Ma
 - Mautic 5.x
 - Composer 2.x
 
-## Installation
+## Installation (Packagist)
 
-### 1) Add the plugin repository to Mautic `composer.json`
-
-Add this entry to the `repositories` section:
-
-```json
-{
-  "type": "vcs",
-  "url": "https://github.com/mauticinsights/mautic-observer"
-}
-```
-
-### 2) Install the plugin with Composer
-
-Run this in the root of your Mautic project:
+Install from the root of your Mautic project — no custom `repositories` entry is required:
 
 ```bash
 composer require mauticinsights/mautic-observer
 ```
 
-If you are installing from a branch without a release tag:
+Pin to the Mautic 5 line (recommended):
+
+```bash
+composer require mauticinsights/mautic-observer:^5.0
+```
+
+Composer installs the bundle into `plugins/MauticInsightsBundle` (`extra.install-directory-name`).
+
+### After install
+
+```bash
+php bin/console cache:clear
+php bin/console mautic:plugins:reload
+```
+
+Then in the Mautic UI:
+
+1. Open **Settings → Plugins**
+2. Find **Mautic Insights**
+3. Enter the Insights API token and required settings
+4. Publish / enable the integration
+
+### Optional: development branch
+
+Only if you need unreleased code from Packagist’s `dev-main`:
 
 ```bash
 composer require mauticinsights/mautic-observer:dev-main -W
 ```
 
-### 3) Clear cache and generate assets
+## Verify it works
 
-```bash
-php bin/console cache:clear --env=prod
-php bin/console cache:warmup --env=prod
-php bin/console mautic:assets:generate
-```
-
-### 4) Activate in Mautic
-
-- open Plugins page in the Mautic UI
-- find **Mautic Insights**
-- fill in the API token and required fields
-- publish/enable the integration
-
-## Verify It Works
-
-- after saving configuration, confirm there are no errors in the Health panel
-- check that events are written/flushed without warnings in Mautic logs
-- if needed, verify cache directory permissions and API endpoint reachability
+- Open the plugin Health panel after saving configuration — no errors
+- Confirm events flush without warnings in Mautic logs
+- Check API endpoint reachability and write access to the Insights buffer directory (`var/mauticinsights-buffer` under the Mautic project)
 
 ## License
 
-The license is available in [LICENSE](./LICENSE).
+Proprietary — see [LICENSE](./LICENSE).
