@@ -475,6 +475,8 @@ final class BulkSyncService
         $payload = [
             'events' => [$event],
             'sync_id' => $syncId,
+            // Route to Insights event_ingestion_bulk so sync does not stall live ingest.
+            'bulk' => true,
         ];
 
         $ok = $this->sender->send(InsightsApiConfig::EVENT_NOTIFY_URL, $token, $payload);
@@ -497,7 +499,12 @@ final class BulkSyncService
     {
         $total = 0;
         foreach (array_chunk($events, self::CHUNK_SIZE) as $chunk) {
-            $payload = ['events' => $chunk, 'sync_id' => $syncId];
+            $payload = [
+                'events' => $chunk,
+                'sync_id' => $syncId,
+                // Route to Insights event_ingestion_bulk so sync does not stall live ingest.
+                'bulk' => true,
+            ];
             $ok = $this->sender->send(InsightsApiConfig::EVENT_NOTIFY_URL, $token, $payload);
             if (!$ok) {
                 $this->logger->error(
