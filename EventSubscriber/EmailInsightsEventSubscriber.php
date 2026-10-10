@@ -7,6 +7,7 @@ namespace MauticPlugin\MauticInsightsBundle\EventSubscriber;
 use Mautic\EmailBundle\EmailEvents;
 use Mautic\EmailBundle\Event\EmailEvent;
 use Mautic\EmailBundle\Event\EmailOpenEvent;
+use Mautic\EmailBundle\Event\EmailReplyEvent;
 use Mautic\EmailBundle\Event\EmailSendEvent;
 use Mautic\EmailBundle\Event\QueueEmailEvent;
 use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
@@ -64,9 +65,9 @@ final class EmailInsightsEventSubscriber implements EventSubscriberInterface
     }
 
     /**
-     * Inbound reply — same {@see EmailOpenEvent} context as {@see EmailEvents::EMAIL_ON_OPEN}.
+     * Inbound reply — Mautic 6+ dispatches {@see EmailReplyEvent} (not {@see EmailOpenEvent}).
      */
-    public function onEmailReply(EmailOpenEvent $event): void
+    public function onEmailReply(EmailReplyEvent $event): void
     {
         if (null === $this->outboundTokenProvider->getToken()) {
             return;
@@ -74,7 +75,7 @@ final class EmailInsightsEventSubscriber implements EventSubscriberInterface
 
         $this->deferredOutboundEventQueue->enqueue(
             EmailEvents::EMAIL_ON_REPLY,
-            $this->emailContextBuilder->buildEmailOpenPayload($event)
+            $this->emailContextBuilder->buildEmailReplyPayload($event)
         );
     }
 
@@ -206,37 +207,38 @@ final class EmailInsightsEventSubscriber implements EventSubscriberInterface
      */
     private function resolvePositiveEmailId(object $email): ?int
     {
-        $candidates = [];
-        if (method_exists($email, 'getId')) {
-            $candidates[] = $email->getId();
-        }
-        if (method_exists($email, 'getDeletedId')) {
-            $candidates[] = $email->getDeletedId();
-        }
+        // Prefer deletedId first — after FormModel::deleteEntity(), getId() is 0 in Mautic 6+.
         if (property_exists($email, 'deletedId')) {
             $vars = \get_object_vars($email);
             if (\array_key_exists('deletedId', $vars)) {
-                $candidates[] = $vars['deletedId'];
+                $fromProp = $this->positiveIntOrNull($vars['deletedId']);
+                if (null !== $fromProp) {
+                    return $fromProp;
+                }
             }
         }
+        if (method_exists($email, 'getDeletedId')) {
+            $fromGetter = $this->positiveIntOrNull($email->getDeletedId());
+            if (null !== $fromGetter) {
+                return $fromGetter;
+            }
+        }
+        if (method_exists($email, 'getId')) {
+            return $this->positiveIntOrNull($email->getId());
+        }
 
-        foreach ($candidates as $raw) {
-            if (null === $raw) {
-                continue;
-            }
-            if (\is_int($raw)) {
-                if ($raw > 0) {
-                    return $raw;
-                }
+        return null;
+    }
 
-                continue;
-            }
-            if (\is_string($raw) && is_numeric($raw)) {
-                $n = (int) $raw;
-                if ($n > 0) {
-                    return $n;
-                }
-            }
+    private function positiveIntOrNull(mixed $raw): ?int
+    {
+        if (\is_int($raw)) {
+            return $raw > 0 ? $raw : null;
+        }
+        if (\is_string($raw) && is_numeric($raw)) {
+            $n = (int) $raw;
+
+            return $n > 0 ? $n : null;
         }
 
         return null;

@@ -57,43 +57,28 @@ final class LeadInsightsContextBuilder
 
     /**
      * After DB delete, {@see \Mautic\CoreBundle\Model\FormModel::deleteEntity} sets {@see \Mautic\CoreBundle\Entity\FormEntity::$deletedId}
-     * to the former primary key (same value as audit log {@code objectId} in {@see \Mautic\LeadBundle\EventListener\LeadSubscriber::onLeadDelete});
-     * {@see Lead::getId()} may then be null. Prefer {@code deletedId} so {@see buildLeadAugmentation} still emits {@code contact_id}.
+     * to the former primary key. In Mautic 6+ {@see Lead::getId()} is typed {@code int} and returns {@code 0} once Doctrine
+     * clears the PK — never treat 0 as a real contact id. Prefer public {@code $deletedId} (same as IntegrationsBundle).
      */
     public function resolvePositiveContactId(Lead $lead): ?int
     {
-        $candidates = [];
-        if (property_exists($lead, 'deletedId')) {
-            $vars = \get_object_vars($lead);
-            if (\array_key_exists('deletedId', $vars)) {
-                $candidates[] = $vars['deletedId'];
+        if (isset($lead->deletedId)) {
+            $deletedId = (int) $lead->deletedId;
+            if ($deletedId > 0) {
+                return $deletedId;
             }
         }
+
         if (method_exists($lead, 'getDeletedId')) {
-            $candidates[] = $lead->getDeletedId();
-        }
-        $candidates[] = $lead->getId();
-
-        foreach ($candidates as $raw) {
-            if (null === $raw) {
-                continue;
-            }
-            if (\is_int($raw)) {
-                if ($raw > 0) {
-                    return $raw;
-                }
-
-                continue;
-            }
-            if (\is_string($raw) && is_numeric($raw)) {
-                $n = (int) $raw;
-                if ($n > 0) {
-                    return $n;
-                }
+            $viaGetter = $lead->getDeletedId();
+            if (\is_int($viaGetter) && $viaGetter > 0) {
+                return $viaGetter;
             }
         }
 
-        return null;
+        $id = $lead->getId();
+
+        return $id > 0 ? $id : null;
     }
 
     /**
@@ -101,7 +86,8 @@ final class LeadInsightsContextBuilder
      */
     private function resolveSegmentIds(Lead $lead): array
     {
-        if (null === $this->resolvePositiveContactId($lead)) {
+        // LeadModel::getLists() uses getId(); after delete that is 0 and would query lead_id = 0.
+        if ($lead->getId() <= 0) {
             return [];
         }
 
@@ -168,17 +154,24 @@ final class LeadInsightsContextBuilder
             $out['phone'] = $phone;
         }
 
-        $tags = [];
-        foreach ($lead->getTags() as $tag) {
-            if (\is_object($tag) && method_exists($tag, 'getTag')) {
-                $t = $tag->getTag();
-                if (\is_string($t) && '' !== $t) {
-                    $tags[] = $t;
+        // After delete, Doctrine associations resolve with lead_id NULL/0 — skip the useless query.
+        if ($lead->getId() > 0) {
+            $tags = [];
+            try {
+                foreach ($lead->getTags() as $tag) {
+                    if (\is_object($tag) && method_exists($tag, 'getTag')) {
+                        $t = $tag->getTag();
+                        if (\is_string($t) && '' !== $t) {
+                            $tags[] = $t;
+                        }
+                    }
                 }
+            } catch (Throwable) {
+                $tags = [];
             }
-        }
-        if ([] !== $tags) {
-            $out['tags'] = $tags;
+            if ([] !== $tags) {
+                $out['tags'] = $tags;
+            }
         }
 
         // Current lead scoring snapshot (not a delta). Mautic's Lead::$points is a scalar int field

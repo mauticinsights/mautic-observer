@@ -36,7 +36,7 @@ final class FormSubmitPayloadBuilder
 
         if (method_exists($submission, 'getForm') && null !== $submission->getForm()) {
             $form = $submission->getForm();
-            if (method_exists($form, 'getId') && null !== $form->getId()) {
+            if (method_exists($form, 'getId') && null !== $form->getId() && (int) $form->getId() > 0) {
                 $properties['form_id'] = (int) $form->getId();
             }
             if (method_exists($form, 'getName') && null !== $form->getName()) {
@@ -56,7 +56,10 @@ final class FormSubmitPayloadBuilder
         if (method_exists($submission, 'getId')) {
             $rawId = $submission->getId();
             if (null !== $rawId && (is_int($rawId) || (is_string($rawId) && is_numeric($rawId)))) {
-                $properties['submission_id'] = (int) $rawId;
+                $submissionId = (int) $rawId;
+                if ($submissionId > 0) {
+                    $properties['submission_id'] = $submissionId;
+                }
             }
         }
 

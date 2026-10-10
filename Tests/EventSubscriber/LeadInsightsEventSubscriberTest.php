@@ -116,6 +116,9 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         $this->assertArrayHasKey(LeadEvents::LEAD_POST_SAVE, $map);
         $this->assertSame('onLeadSave', $map[LeadEvents::LEAD_POST_SAVE][0]);
 
+        $this->assertArrayHasKey(LeadEvents::LEAD_PRE_DELETE, $map);
+        $this->assertSame(['onLeadPreDelete', 0], $map[LeadEvents::LEAD_PRE_DELETE]);
+
         $this->assertArrayHasKey(LeadEvents::LEAD_POST_DELETE, $map);
         $this->assertSame(['onLeadDelete', 0], $map[LeadEvents::LEAD_POST_DELETE]);
 
@@ -218,6 +221,8 @@ final class LeadInsightsEventSubscriberTest extends TestCase
     {
         [$buffer, $queue, $subscriber] = $this->makeStack([['id' => 5], ['id' => 9]]);
 
+        // PRE_DELETE while getId() is still valid (segments/tags); POST_DELETE uses deletedId + cached payload.
+        $subscriber->onLeadPreDelete(new LeadEvent($this->makeFullLead(), false));
         $subscriber->onLeadDelete(new LeadEvent($this->makeFullLeadPostDeleted(), false));
         $queue->flushTo($buffer);
 
@@ -399,9 +404,8 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         $this->assertCount(1, $rows);
         $this->assertSame(77, $rows[0]['contact_id']);
         $this->assertSame(LeadEvents::LEAD_POST_MERGE, $rows[0]['event']);
-        // survivor_id is emitted but null when the winner has no id
-        $this->assertArrayHasKey('survivor_id', $rows[0]['properties']);
-        $this->assertNull($rows[0]['properties']['survivor_id']);
+        // Mautic 6+: missing winner id is getId()===0 — omit survivor_id rather than send 0/null.
+        $this->assertArrayNotHasKey('survivor_id', $rows[0]['properties']);
     }
 
     // ──────────────────────────────────────────────────────────────

@@ -100,37 +100,38 @@ final class CampaignAnalyticsEventSubscriber implements EventSubscriberInterface
      */
     private function resolvePositiveCampaignId(object $campaign): ?int
     {
-        $candidates = [];
-        if (method_exists($campaign, 'getId')) {
-            $candidates[] = $campaign->getId();
-        }
-        if (method_exists($campaign, 'getDeletedId')) {
-            $candidates[] = $campaign->getDeletedId();
-        }
+        // Prefer deletedId first — after FormModel::deleteEntity(), getId() is 0 in Mautic 6+.
         if (property_exists($campaign, 'deletedId')) {
             $vars = \get_object_vars($campaign);
             if (\array_key_exists('deletedId', $vars)) {
-                $candidates[] = $vars['deletedId'];
+                $fromProp = $this->positiveIntOrNull($vars['deletedId']);
+                if (null !== $fromProp) {
+                    return $fromProp;
+                }
             }
         }
+        if (method_exists($campaign, 'getDeletedId')) {
+            $fromGetter = $this->positiveIntOrNull($campaign->getDeletedId());
+            if (null !== $fromGetter) {
+                return $fromGetter;
+            }
+        }
+        if (method_exists($campaign, 'getId')) {
+            return $this->positiveIntOrNull($campaign->getId());
+        }
 
-        foreach ($candidates as $raw) {
-            if (null === $raw) {
-                continue;
-            }
-            if (\is_int($raw)) {
-                if ($raw > 0) {
-                    return $raw;
-                }
+        return null;
+    }
 
-                continue;
-            }
-            if (\is_string($raw) && is_numeric($raw)) {
-                $n = (int) $raw;
-                if ($n > 0) {
-                    return $n;
-                }
-            }
+    private function positiveIntOrNull(mixed $raw): ?int
+    {
+        if (\is_int($raw)) {
+            return $raw > 0 ? $raw : null;
+        }
+        if (\is_string($raw) && is_numeric($raw)) {
+            $n = (int) $raw;
+
+            return $n > 0 ? $n : null;
         }
 
         return null;
@@ -147,8 +148,7 @@ final class CampaignAnalyticsEventSubscriber implements EventSubscriberInterface
             return;
         }
 
-        $campaign = $event->getCampaign();
-        $campaignId = $campaign->getId();
+        $campaignId = $this->resolvePositiveCampaignId($event->getCampaign());
         if (null === $campaignId) {
             return;
         }
@@ -211,7 +211,7 @@ final class CampaignAnalyticsEventSubscriber implements EventSubscriberInterface
 
     private function pushCampaignLeadMembership(string $eventName, ?int $contactId, int $campaignId): void
     {
-        if (null === $contactId) {
+        if (null === $contactId || $contactId <= 0 || $campaignId <= 0) {
             return;
         }
 

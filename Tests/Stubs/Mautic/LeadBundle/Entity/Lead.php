@@ -53,9 +53,12 @@ class Lead
      */
     public ?int $stubPoints = null;
 
-    public function getId(): ?int
+    /**
+     * Mirrors Mautic {@see Lead::getId(): int} — returns 0 when the PK was cleared after delete.
+     */
+    public function getId(): int
     {
-        return $this->stubId;
+        return (int) $this->stubId;
     }
 
     public function getDeletedId(): ?int

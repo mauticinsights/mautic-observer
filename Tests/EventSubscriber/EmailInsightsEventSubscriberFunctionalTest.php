@@ -9,6 +9,7 @@ use Mautic\EmailBundle\Entity\Email;
 use Mautic\EmailBundle\Entity\Stat;
 use Mautic\EmailBundle\Event\EmailEvent;
 use Mautic\EmailBundle\Event\EmailOpenEvent;
+use Mautic\EmailBundle\Event\EmailReplyEvent;
 use Mautic\EmailBundle\Event\EmailSendEvent;
 use Mautic\EmailBundle\Event\QueueEmailEvent;
 use Mautic\EmailBundle\Mailer\Message\MauticMessage;
@@ -449,13 +450,14 @@ final class EmailInsightsEventSubscriberFunctionalTest extends TestCase
             3,
             new LeadList(1),
         );
-        $subscriber->onEmailReply(new EmailOpenEvent($stat, false));
+        $subscriber->onEmailReply(new EmailReplyEvent($stat));
         $queue->flushTo($buffer);
 
         $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
         $this->assertSame(EmailEvents::EMAIL_ON_REPLY, $rows[0]['event']);
         $this->assertSame(9, $rows[0]['email_id']);
         $this->assertSame(5, $rows[0]['contact_id']);
+        $this->assertArrayNotHasKey('first_open', $rows[0]['properties'] ?? []);
     }
 
     public function testEmailFailedQueuePayload(): void
