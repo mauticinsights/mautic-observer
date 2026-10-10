@@ -8,20 +8,11 @@ use Mautic\CoreBundle\Helper\EncryptionHelper;
 use Throwable;
 
 /**
- * Guards Mautic's IntegrationsBundle EncryptionService against edge-case values.
+ * Array-level encrypt/decrypt guard used by standalone unit tests.
  *
- * On fresh plugin installs Mautic seeds api_keys with empty strings
- * (e.g. {'http_token': ''}). After IntegrationsHelper::saveIntegrationConfiguration()
- * the entity's api_keys are also temporarily restored to plain text. In both
- * cases calling EncryptionHelper::decrypt() emits a PHP Warning (Undefined
- * array key 1 from the '|' split) and on PHP 8.2 throws a TypeError from
- * base64_decode(null), which propagates as HTTP 500 from the integration config
- * save controller.
- *
- * This class replicates the encrypt/decrypt interface of EncryptionService
- * (without extending it, to keep the plugin self-contained and satisfy PHPStan)
- * and is registered via services.php as EncryptionService::class so all code
- * paths in IntegrationsBundle are covered.
+ * Production wiring (Mautic 7+) decorates {@see EncryptionHelper} with
+ * {@see SafeEncryptionHelper} because IntegrationsBundle's {@code EncryptionService}
+ * is final and cannot be replaced in the container.
  */
 final class SafeEncryptionService
 {

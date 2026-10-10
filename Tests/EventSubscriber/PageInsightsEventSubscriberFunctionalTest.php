@@ -191,7 +191,7 @@ final class PageInsightsEventSubscriberFunctionalTest extends TestCase
         $this->assertSame(7, $row['campaign_id']);
 
         $props = $row['properties'];
-        $this->assertSame(true, $props['is_unique']);
+        $this->assertTrue($props['is_unique']);
         $this->assertSame(200, $props['http_code']);
         $this->assertSame(987654, $props['hit_id']);
         $this->assertSame('external', $props['hit_type']);

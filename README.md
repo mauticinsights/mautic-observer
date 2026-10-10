@@ -4,7 +4,7 @@ Observes Mautic contact, email, campaign, form, page and segment events and stre
 
 Package: [`mauticinsights/mautic-observer`](https://packagist.org/packages/mauticinsights/mautic-observer) on Packagist.
 
-**This branch (`6.x`) targets Mautic 6.** Use branch `5.x` / package `^5.0` for Mautic 5.
+**This branch (`7.x` / `main`) targets Mautic 7.** Use branch `6.x` / package `^6.0` for Mautic 6, or `5.x` / `^5.0` for Mautic 5.
 
 ## What this plugin does
 
@@ -18,12 +18,19 @@ Package: [`mauticinsights/mautic-observer`](https://packagist.org/packages/mauti
 |------|-----|--------|----------------------|
 | Mautic 5 | PHP 8.0+ | Mautic 5.x | `mauticinsights/mautic-observer:^5.0` |
 | Mautic 6 | PHP 8.1+ | Mautic 6.x (`mautic/core-lib` ^6.0) | `mauticinsights/mautic-observer:^6.0` |
+| Mautic 7 | PHP 8.2+ | Mautic 7.x (`mautic/core-lib` ^7.0) | `mauticinsights/mautic-observer:^7.0` |
 
 - Composer 2.x
 
 ## Installation (Packagist)
 
 Install from the root of your Mautic project — no custom `repositories` entry is required.
+
+### Mautic 7
+
+```bash
+composer require mauticinsights/mautic-observer:^7.0
+```
 
 ### Mautic 6
 
@@ -56,6 +63,9 @@ Then in the Mautic UI:
 ### Optional: development branches
 
 ```bash
+# Mautic 7
+composer require mauticinsights/mautic-observer:dev-main -W
+
 # Mautic 6
 composer require mauticinsights/mautic-observer:dev-6.x -W
 

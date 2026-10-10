@@ -54,14 +54,14 @@ final class IntegrationApiKeysSaveFlowTest extends TestCase
             {
             }
 
-            public function encrypt(mixed $data): string
+            public function encrypt($data): string
             {
                 $payload = base64_encode((string) $data);
 
                 return $payload.'|'.base64_encode('iv');
             }
 
-            public function decrypt(mixed $key, bool $mainDecryptOnly = false)
+            public function decrypt($key, $mainDecryptOnly = false)
             {
                 if (!\is_string($key) || !str_contains($key, '|')) {
                     return false;

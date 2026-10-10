@@ -95,7 +95,7 @@ class EncryptionHelper
     /**
      * @return mixed|false
      */
-    public function decrypt($key, bool $mainDecryptOnly = false)
+    public function decrypt($key, $mainDecryptOnly = false)
     {
         return $key;
     }

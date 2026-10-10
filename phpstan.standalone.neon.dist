@@ -1,0 +1,44 @@
+# Standalone PHPStan when mautic/core-lib is not available (plugin vendor/bin/phpstan).
+# Mautic framework classes come from phpstan/stubs + Tests/Stubs (autoload-dev).
+
+parameters:
+    level: 6
+    phpVersion: 80100
+    tmpDir: .phpstan-cache
+    treatPhpDocTypesAsCertain: false
+    reportUnmatchedIgnoredErrors: false
+    paths:
+        - InsightsApiConfig.php
+        - DependencyInjection
+        - EventSubscriber
+        - Service
+        - Buffer
+        - Form
+        - Integration
+        - Command
+        - MauticInsightsBundle.php
+    bootstrapFiles:
+        - phpstan/bootstrap-mautic-stubs.php
+    excludePaths:
+        analyse:
+            - Config/services.php
+    ignoreErrors:
+        -
+            identifier: notIdentical.alwaysFalse
+            path: Buffer/DatabaseEventBuffer.php
+        - identifier: function.alreadyNarrowedType
+        - identifier: notIdentical.alwaysTrue
+        - identifier: instanceof.alwaysTrue
+        - identifier: missingType.generics
+        -
+            identifier: missingType.parameter
+            path: Service/SafeEncryptionHelper.php
+        -
+            message: '#Call to an undefined method Mautic\\UserBundle\\Entity\\User::getLocale\(\)#'
+            path: Service/InsightsPluginHealthProvider.php
+        -
+            identifier: function.impossibleType
+            path: MauticInsightsBundle.php
+        -
+            identifier: classConstant.deprecated
+            path: Integration/MauticInsightsIntegration.php

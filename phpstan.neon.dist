@@ -1,45 +1,71 @@
-# PHPStan for standalone dev (mautic/core-lib is not installed).
-# Mautic framework classes come from phpstan/stubs/mautic-stubs.php; Plugin Integration from Tests/Stubs (autoload-dev).
-# Config/services.php still references MauticCoreExtension — excluded.
+# Monorepo PHPStan (composer phpstan → ../../bin/phpstan).
+# Uses real Mautic classes from the root vendor; do not bootstrap Tests/Stubs.
+# Standalone stub-based analysis: phpstan.standalone.neon.dist
 
 parameters:
     level: 6
-    phpVersion: 80100
     tmpDir: .phpstan-cache
-    # Doctrine DBAL connection params include Mautic-specific keys (e.g. table_prefix) not in generic PHPDoc shapes.
+    reportUnmatchedIgnoredErrors: false
     treatPhpDocTypesAsCertain: false
-    paths:
-        - InsightsApiConfig.php
-        - DependencyInjection
-        - EventSubscriber
-        - Service
-        - Tests
+
     bootstrapFiles:
-        - phpstan/bootstrap-mautic-stubs.php
+        - phpstan-bootstrap.php
+
+    paths:
+        - .
+
     excludePaths:
-        analyse:
-            - Config/services.php
+        - vendor/*
+        - node_modules/*
+        - .phpstan-cache/*
+        # Stub doubles for standalone PHPUnit — not real Mautic APIs.
+        - Tests/Stubs/*
+        - phpstan/*
+        # Tests target stub entities (stubId, etc.); analysed under standalone neon if needed.
+        - Tests/*
+        # CI (mautic-ci-runner) may copy this neon to the Mautic root.
+        - plugins/MauticInsightsBundle/Tests/*
+        - plugins/MauticInsightsBundle/Tests/Stubs/*
+        - plugins/MauticInsightsBundle/phpstan/*
+        - plugins/MauticInsightsBundle/vendor/*
+
+    dynamicConstantNames:
+        - MAUTIC_ENV
+        - MAUTIC_TABLE_PREFIX
+        - MAUTIC_VERSION
+
     ignoreErrors:
-        # table_prefix is Mautic-specific; DBAL getParams() PHPDoc omits it so PHPStan thinks $prefix is always ''.
+        # Same as Mautic root phpstan.neon — Symfony Form AbstractType generics.
+        - identifier: missingType.generics
+        # Cross-version runtime guards (method_exists / is_array) still useful on older Mautic lines.
+        - identifier: function.alreadyNarrowedType
+        - identifier: notIdentical.alwaysTrue
+        - identifier: instanceof.alwaysTrue
+        # table_prefix is Mautic-specific; DBAL getParams() PHPDoc omits it.
         -
             identifier: notIdentical.alwaysFalse
             path: Buffer/DatabaseEventBuffer.php
-        # Untyped $message / $level match psr/log 1.x LoggerInterface (production Mautic may resolve older psr/log).
+        -
+            identifier: notIdentical.alwaysFalse
+            path: plugins/MauticInsightsBundle/Buffer/DatabaseEventBuffer.php
+        # Legacy class aliases for moved Buffer\* types; class_exists(..., false) is intentional.
+        -
+            identifier: function.impossibleType
+            path: MauticInsightsBundle.php
+        -
+            identifier: function.impossibleType
+            path: plugins/MauticInsightsBundle/MauticInsightsBundle.php
+        # BC alias kept for older integrations reading SEGMENT_NOTIFY_URL.
+        -
+            identifier: classConstant.deprecated
+            path: Integration/MauticInsightsIntegration.php
+        -
+            identifier: classConstant.deprecated
+            path: plugins/MauticInsightsBundle/Integration/MauticInsightsIntegration.php
+        # Must mirror core EncryptionHelper (untyped params).
         -
             identifier: missingType.parameter
-            path: Service/InsightsPluginLogger.php
-        # getLocale() exists on real Mautic User entity but is not picked up from bootstrapFiles stubs.
+            path: Service/SafeEncryptionHelper.php
         -
-            message: '#Call to an undefined method Mautic\\UserBundle\\Entity\\User::getLocale\(\)#'
-            path: Service/InsightsPluginHealthProvider.php
-        # createMock() returns unresolvable type when mocking classes with Doctrine/Symfony deps
-        # not covered by stubs (BulkSyncService → Connection, Command, HttpKernelInterface).
-        -
-            message: '#createMock\(\) contains unresolvable type#'
-            path: Tests/EventSubscriber/BulkSyncOnEnableSubscriberFunctionalTest.php
-        -
-            message: '#createMock\(\) contains unresolvable type#'
-            path: Tests/Command/SegmentReconcileCommandTest.php
-        -
-            message: '#createMock\(\) contains unresolvable type#'
-            path: Tests/Service/SegmentReconcileServiceTest.php
+            identifier: missingType.parameter
+            path: plugins/MauticInsightsBundle/Service/SafeEncryptionHelper.php

@@ -7,6 +7,7 @@ namespace MauticPlugin\MauticInsightsBundle\Service;
 use Mautic\EmailBundle\Entity\Email;
 use Mautic\EmailBundle\Entity\Stat;
 use Mautic\EmailBundle\Event\EmailOpenEvent;
+use Mautic\EmailBundle\Event\EmailReplyEvent;
 use Mautic\EmailBundle\Event\EmailSendEvent;
 use Mautic\EmailBundle\Event\QueueEmailEvent;
 use Mautic\LeadBundle\Entity\Lead;
@@ -34,7 +35,7 @@ final class EmailInsightsContextBuilder
         $email = $event->getEmail();
         if (null !== $email) {
             $eid = $email->getId();
-            if (null !== $eid) {
+            if (null !== $eid && (int) $eid > 0) {
                 $payload['email_id'] = (int) $eid;
             }
             $this->addEmailTemplateProperties($payload, $email);
@@ -55,20 +56,39 @@ final class EmailInsightsContextBuilder
      */
     public function buildEmailOpenPayload(EmailOpenEvent $event): array
     {
+        $payload = $this->buildPayloadFromStat($event->getEmail(), $event->getStat());
+        $this->appendOpenProperties($payload, $event);
+
+        return $payload;
+    }
+
+    /**
+     * Inbound reply — same channel/email/contact shape as open, without {@code first_open}.
+     *
+     * @return array<string, mixed>
+     */
+    public function buildEmailReplyPayload(EmailReplyEvent $event): array
+    {
+        return $this->buildPayloadFromStat($event->getEmail(), $event->getStat());
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildPayloadFromStat(?Email $email, Stat $stat): array
+    {
         $payload = [
             'channel' => 'email',
         ];
 
-        $email = $event->getEmail();
         if (null !== $email) {
             $eid = $email->getId();
-            if (null !== $eid) {
+            if (null !== $eid && (int) $eid > 0) {
                 $payload['email_id'] = (int) $eid;
             }
             $this->addEmailTemplateProperties($payload, $email);
         }
 
-        $stat = $event->getStat();
         $campaignId = $this->campaignIdFromStatSource($stat);
         if (null !== $campaignId) {
             $payload['campaign_id'] = $campaignId;
@@ -76,8 +96,6 @@ final class EmailInsightsContextBuilder
 
         $listId = $this->segmentIdFromStatList($stat);
         $this->mergeLeadAndStatSegment($payload, $stat->getLead(), $listId);
-
-        $this->appendOpenProperties($payload, $event);
 
         return $payload;
     }
@@ -196,7 +214,10 @@ final class EmailInsightsContextBuilder
         }
 
         if (\is_array($lead) && isset($lead['id']) && is_numeric($lead['id'])) {
-            $payload['contact_id'] = (int) $lead['id'];
+            $contactId = (int) $lead['id'];
+            if ($contactId > 0) {
+                $payload['contact_id'] = $contactId;
+            }
         }
     }
 
@@ -264,7 +285,9 @@ final class EmailInsightsContextBuilder
             return null;
         }
 
-        return (int) $source[1];
+        $id = (int) $source[1];
+
+        return $id > 0 ? $id : null;
     }
 
     private function campaignIdFromStatSource(Stat $stat): ?int
@@ -278,7 +301,9 @@ final class EmailInsightsContextBuilder
             return null;
         }
 
-        return (int) $sid;
+        $id = (int) $sid;
+
+        return $id > 0 ? $id : null;
     }
 
     private function segmentIdFromStatList(Stat $stat): ?int
@@ -293,6 +318,8 @@ final class EmailInsightsContextBuilder
             return null;
         }
 
-        return (int) $id;
+        $n = (int) $id;
+
+        return $n > 0 ? $n : null;
     }
 }

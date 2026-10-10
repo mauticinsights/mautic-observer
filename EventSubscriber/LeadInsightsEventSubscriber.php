@@ -23,6 +23,14 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
  */
 class LeadInsightsEventSubscriber implements EventSubscriberInterface
 {
+    /**
+     * Payloads captured on {@see LeadEvents::LEAD_PRE_DELETE} while {@see Lead::getId()} is still valid.
+     * Keyed by contact id; consumed in {@see onLeadDelete()}.
+     *
+     * @var array<int, array<string, mixed>>
+     */
+    private array $preDeletePayloads = [];
+
     public function __construct(
         private MauticEventBuffer $eventBuffer,
         private LeadInsightsContextBuilder $contextBuilder,
@@ -39,6 +47,8 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
             // our LEAD_IDENTIFIED row to get a ts a few ms earlier than our LEAD_POST_SAVE row. Running first keeps
             // LEAD_POST_SAVE's ts strictly before the nested LEAD_IDENTIFIED ts, matching Mautic's actual top-level dispatch order.
             LeadEvents::LEAD_POST_SAVE => ['onLeadSave', 255],
+            // Mautic 7: after delete Lead::getId() is 0; capture full payload (incl. segments) while the PK is still set.
+            LeadEvents::LEAD_PRE_DELETE => ['onLeadPreDelete', 0],
             LeadEvents::LEAD_POST_DELETE => ['onLeadDelete', 0],
             LeadEvents::LEAD_POST_MERGE => ['onLeadMerge', 0],
             LeadEvents::LEAD_POINTS_CHANGE => ['onPointsChange', 0],
@@ -74,6 +84,25 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
         $this->enqueueLeadPseudoEventsFromPostSaveChanges($lead);
     }
 
+    public function onLeadPreDelete(LeadEvent $event): void
+    {
+        if (null === $this->outboundTokenProvider->getToken()) {
+            return;
+        }
+
+        $lead = $event->getLead();
+        if ($lead->isAnonymous()) {
+            return;
+        }
+
+        $id = $lead->getId();
+        if ($id <= 0) {
+            return;
+        }
+
+        $this->preDeletePayloads[$id] = $this->contextBuilder->buildPayloadFromLead($lead);
+    }
+
     public function onLeadDelete(LeadEvent $event): void
     {
         if (null === $this->outboundTokenProvider->getToken()) {
@@ -85,10 +114,16 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
             return;
         }
 
-        $this->deferredLeadOutboundQueue->enqueue(
-            LeadEvents::LEAD_POST_DELETE,
-            $this->contextBuilder->buildPayloadFromLead($lead)
-        );
+        $id = $this->contextBuilder->resolvePositiveContactId($lead);
+        $payload = null !== $id && isset($this->preDeletePayloads[$id])
+            ? $this->preDeletePayloads[$id]
+            : $this->contextBuilder->buildPayloadFromLead($lead);
+
+        if (null !== $id) {
+            unset($this->preDeletePayloads[$id]);
+        }
+
+        $this->deferredLeadOutboundQueue->enqueue(LeadEvents::LEAD_POST_DELETE, $payload);
     }
 
     /**
@@ -116,13 +151,16 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
             return;
         }
 
-        $payload = $this->mergeLeadProperties($loser, [
-            'survivor_id' => $event->getVictor()->getId(),
-        ]);
+        $extra = [];
+        $survivorId = $event->getVictor()->getId();
+        // Mautic 7 Lead::getId() returns 0 when unset — do not emit a fake survivor.
+        if ($survivorId > 0) {
+            $extra['survivor_id'] = $survivorId;
+        }
 
         $this->deferredLeadOutboundQueue->enqueue(
             LeadEvents::LEAD_POST_MERGE,
-            $payload
+            $this->mergeLeadProperties($loser, $extra)
         );
     }
 

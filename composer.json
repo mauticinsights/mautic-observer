@@ -1,7 +1,7 @@
 {
     "name": "mauticinsights/mautic-observer",
     "description": "Observes Mautic contact, email, campaign, form, page and segment events and streams them to the Mautic Insights ingest API.",
-    "version": "6.0.1",
+    "version": "7.0.0",
     "type": "mautic-plugin",
     "license": "proprietary",
     "keywords": [
@@ -12,10 +12,10 @@
         "install-directory-name": "MauticInsightsBundle"
     },
     "require": {
-        "php": ">=8.1"
+        "php": ">=8.2"
     },
     "suggest": {
-        "mautic/core-lib": "Mautic 6.x core (^6.0) — required in production; not installed in this repo for standalone dev tooling.",
+        "mautic/core-lib": "Mautic 7.x core (^7.0) — required in production; not installed in this repo for standalone dev tooling.",
         "ext-redis": "Optional: Redis fallback for the API event buffer when the filesystem cache directory is not writable."
     },
     "require-dev": {
@@ -45,12 +45,11 @@
         }
     },
     "scripts": {
-        "cs-fixer": "php-cs-fixer fix",
-        "cs-check": "php-cs-fixer fix --dry-run --diff",
-        "test": "phpunit",
-        "phpstan": "phpstan analyse -c phpstan.neon.dist --no-progress --memory-limit=512M",
-        "ci": [
-            "@cs-check",
+        "cs-fixer": "../../bin/php-cs-fixer fix --config .php-cs-fixer.php --show-progress dots -v",
+        "phpstan": "../../bin/phpstan analyse . --memory-limit=1G -c phpstan.neon.dist",
+        "test": "../../bin/phpunit -d memory_limit=2048M --configuration phpunit.xml.dist --fail-on-warning",
+        "all": [
+            "@cs-fixer",
             "@phpstan",
             "@test"
         ]
@@ -59,7 +58,7 @@
     "prefer-stable": true,
     "config": {
         "platform": {
-            "php": "8.1.0"
+            "php": "8.2.0"
         },
         "sort-packages": true
     }

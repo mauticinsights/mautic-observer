@@ -93,37 +93,38 @@ final class SegmentInsightsEventSubscriber implements EventSubscriberInterface
      */
     private function resolvePositiveLeadListId(object $list): ?int
     {
-        $candidates = [];
-        if (method_exists($list, 'getId')) {
-            $candidates[] = $list->getId();
-        }
-        if (method_exists($list, 'getDeletedId')) {
-            $candidates[] = $list->getDeletedId();
-        }
+        // Prefer deletedId first — after FormModel::deleteEntity(), getId() is 0 in Mautic 7.
         if (property_exists($list, 'deletedId')) {
             $vars = \get_object_vars($list);
             if (\array_key_exists('deletedId', $vars)) {
-                $candidates[] = $vars['deletedId'];
+                $fromProp = $this->positiveIntOrNull($vars['deletedId']);
+                if (null !== $fromProp) {
+                    return $fromProp;
+                }
             }
         }
+        if (method_exists($list, 'getDeletedId')) {
+            $fromGetter = $this->positiveIntOrNull($list->getDeletedId());
+            if (null !== $fromGetter) {
+                return $fromGetter;
+            }
+        }
+        if (method_exists($list, 'getId')) {
+            return $this->positiveIntOrNull($list->getId());
+        }
 
-        foreach ($candidates as $raw) {
-            if (null === $raw) {
-                continue;
-            }
-            if (\is_int($raw)) {
-                if ($raw > 0) {
-                    return $raw;
-                }
+        return null;
+    }
 
-                continue;
-            }
-            if (\is_string($raw) && is_numeric($raw)) {
-                $n = (int) $raw;
-                if ($n > 0) {
-                    return $n;
-                }
-            }
+    private function positiveIntOrNull(mixed $raw): ?int
+    {
+        if (\is_int($raw)) {
+            return $raw > 0 ? $raw : null;
+        }
+        if (\is_string($raw) && is_numeric($raw)) {
+            $n = (int) $raw;
+
+            return $n > 0 ? $n : null;
         }
 
         return null;

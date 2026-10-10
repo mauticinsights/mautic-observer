@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use Mautic\CoreBundle\DependencyInjection\MauticCoreExtension;
-use Mautic\IntegrationsBundle\Facade\EncryptionService;
+use Mautic\CoreBundle\Helper\EncryptionHelper;
 use MauticPlugin\MauticInsightsBundle\Buffer\ConfigurablePersistentEventBuffer;
 use MauticPlugin\MauticInsightsBundle\Buffer\DatabaseEventBuffer;
 use MauticPlugin\MauticInsightsBundle\Buffer\DeferredOutboundEventQueue;
@@ -20,7 +20,7 @@ use MauticPlugin\MauticInsightsBundle\Service\InsightsLastApiTelemetry;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsOutboundTokenProvider;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPluginLogger;
 use MauticPlugin\MauticInsightsBundle\Service\InsightsPluginLoggingFeatureReader;
-use MauticPlugin\MauticInsightsBundle\Service\SafeEncryptionService;
+use MauticPlugin\MauticInsightsBundle\Service\SafeEncryptionHelper;
 use MauticPlugin\MauticInsightsBundle\Service\SegmentCheckpointStore;
 use MauticPlugin\MauticInsightsBundle\Service\SyncSessionManager;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
@@ -52,8 +52,10 @@ return function (ContainerConfigurator $configurator): void {
             'Service/InsightsApiOutageCoordinator.php',
             // $dataDir must be explicit; also avoids accidental EntityManagerInterface injection.
             'Service/SyncSessionManager.php',
-            // Registered explicitly as override for EncryptionService::class.
+            // Kept for standalone unit tests; production uses SafeEncryptionHelper decorate.
             'Service/SafeEncryptionService.php',
+            // Registered explicitly as decorate(EncryptionHelper::class).
+            'Service/SafeEncryptionHelper.php',
         ]
     );
 
@@ -104,7 +106,9 @@ return function (ContainerConfigurator $configurator): void {
     $services->set(InsightsLastApiTelemetry::class)
         ->arg('$dataDir', '%kernel.project_dir%/var/mauticinsights-buffer');
 
-    // Override IntegrationsBundle's EncryptionService with a safe subclass that handles
-    // empty strings and plain-text values gracefully (PHP 8.2 TypeError prevention).
-    $services->set(EncryptionService::class, SafeEncryptionService::class);
+    // EncryptionService is final in Mautic 7 — decorate EncryptionHelper instead so
+    // IntegrationsHelper keeps a real EncryptionService while empty/plain api_keys stay safe.
+    $services->set(SafeEncryptionHelper::class)
+        ->decorate(EncryptionHelper::class)
+        ->arg('$inner', service('.inner'));
 };
