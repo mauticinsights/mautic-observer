@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MauticPlugin\MauticInsightsBundle\Form\Type;
 
+use Mautic\IntegrationsBundle\Integration\Interfaces\IntegrationInterface;
 use MauticPlugin\MauticInsightsBundle\Form\Validation\HttpTokenConstraintFactory;
 use MauticPlugin\MauticInsightsBundle\InsightsApiConfig;
 use MauticPlugin\MauticInsightsBundle\Integration\MauticInsightsIntegration;
@@ -36,9 +37,9 @@ class AuthConfigType extends AbstractType
             htmlspecialchars(InsightsApiConfig::APP_INSTANCES_SETTINGS_URL, ENT_QUOTES, 'UTF-8')
         );
 
-        /** @var array<string, mixed> $apiKeys */
-        $apiKeys = \is_array($options['data'] ?? null) ? $options['data'] : [];
-        $hasExistingToken = '' !== \trim((string) ($apiKeys[InsightsApiConfig::HTTP_TOKEN_FIELD] ?? ''));
+        // Nested apiKeys form: $options['data'] is often empty during buildForm().
+        // Stored credentials live on the Integration entity via $options['integration'].
+        $hasExistingToken = $this->hasStoredHttpToken($options);
 
         $builder->add(
             MauticInsightsIntegration::HTTP_TOKEN_FIELD,
@@ -79,5 +80,26 @@ class AuthConfigType extends AbstractType
             'integration' => null,
         ]);
         $resolver->setAllowedTypes('integration', ['null', 'object']);
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function hasStoredHttpToken(array $options): bool
+    {
+        $field = InsightsApiConfig::HTTP_TOKEN_FIELD;
+
+        $integration = $options['integration'] ?? null;
+        if ($integration instanceof IntegrationInterface && $integration->hasIntegrationConfiguration()) {
+            $stored = $integration->getIntegrationConfiguration()->getApiKeys();
+            if ('' !== \trim((string) ($stored[$field] ?? ''))) {
+                return true;
+            }
+        }
+
+        /** @var array<string, mixed> $data */
+        $data = \is_array($options['data'] ?? null) ? $options['data'] : [];
+
+        return '' !== \trim((string) ($data[$field] ?? ''));
     }
 }
