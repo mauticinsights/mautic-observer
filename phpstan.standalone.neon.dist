@@ -37,8 +37,5 @@ parameters:
             message: '#Call to an undefined method Mautic\\UserBundle\\Entity\\User::getLocale\(\)#'
             path: Service/InsightsPluginHealthProvider.php
         -
-            identifier: function.impossibleType
-            path: MauticInsightsBundle.php
-        -
             identifier: classConstant.deprecated
             path: Integration/MauticInsightsIntegration.php

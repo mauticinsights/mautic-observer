@@ -107,7 +107,55 @@ class YesNoButtonGroupType
 {
 }
 
+namespace Mautic\IntegrationsBundle\Bundle;
+
+class AbstractPluginBundle
+{
+    public function boot(): void
+    {
+    }
+}
+
 namespace Mautic\IntegrationsBundle\Integration\Interfaces;
+
+use Mautic\PluginBundle\Entity\Integration;
+
+interface IntegrationInterface
+{
+    public function getName(): string;
+
+    public function getDisplayName(): string;
+
+    public function hasIntegrationConfiguration(): bool;
+
+    public function getIntegrationConfiguration(): Integration;
+
+    /**
+     * @return mixed
+     */
+    public function setIntegrationConfiguration(Integration $integration);
+}
+
+interface BasicInterface
+{
+    public function getName(): string;
+
+    public function getIcon(): string;
+}
+
+interface ConfigFormAuthInterface
+{
+    public function getAuthConfigFormName(): string;
+}
+
+interface ConfigFormInterface extends IntegrationInterface
+{
+    public function getDisplayName(): string;
+
+    public function getConfigFormName(): ?string;
+
+    public function getConfigFormContentTemplate(): ?string;
+}
 
 interface ConfigFormFeatureSettingsInterface
 {
@@ -116,12 +164,61 @@ interface ConfigFormFeatureSettingsInterface
 
 namespace Mautic\IntegrationsBundle\Integration;
 
+use Mautic\IntegrationsBundle\Integration\Interfaces\IntegrationInterface;
 use Mautic\PluginBundle\Entity\Integration;
 
-class BasicIntegration
+trait ConfigurationTrait
 {
+    private ?Integration $integration = null;
+
+    public function getIntegrationConfiguration(): Integration
+    {
+        return $this->integration;
+    }
+
+    public function setIntegrationConfiguration(Integration $integration): void
+    {
+        $this->integration = $integration;
+    }
+
+    public function hasIntegrationConfiguration(): bool
+    {
+        return null !== $this->integration;
+    }
+}
+
+abstract class BasicIntegration implements IntegrationInterface
+{
+    use ConfigurationTrait;
+
+    abstract public function getName(): string;
+
+    public function getDisplayName(): string
+    {
+        return $this->getName();
+    }
+
     public function setIntegrationSettings(Integration $integration): void
     {
+        $this->setIntegrationConfiguration($integration);
+    }
+}
+
+trait DefaultConfigFormTrait
+{
+    public function getConfigFormName(): ?string
+    {
+        return null;
+    }
+
+    public function getConfigFormContentTemplate(): ?string
+    {
+        return null;
+    }
+
+    public function getSyncConfigFormName(): ?string
+    {
+        return null;
     }
 }
 
@@ -359,9 +456,12 @@ class Lead
 {
     public ?\DateTimeInterface $dateIdentified = null;
 
-    public function getId(): ?int
+    /** @var int|null former PK after FormModel::deleteEntity (Mautic 7 public property) */
+    public ?int $deletedId = null;
+
+    public function getId(): int
     {
-        return null;
+        return 0;
     }
 
     public function getDeletedId(): ?int

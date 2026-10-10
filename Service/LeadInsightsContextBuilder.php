@@ -74,12 +74,6 @@ final class LeadInsightsContextBuilder
             if (\is_int($viaGetter) && $viaGetter > 0) {
                 return $viaGetter;
             }
-            if (\is_string($viaGetter) && is_numeric($viaGetter)) {
-                $n = (int) $viaGetter;
-                if ($n > 0) {
-                    return $n;
-                }
-            }
         }
 
         $id = $lead->getId();
