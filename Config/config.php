@@ -5,7 +5,7 @@ declare(strict_types=1);
 return [
     'name' => 'Mautic Insights',
     'description' => 'Observes Mautic events and streams them to the Mautic Insights ingest API.',
-    'version' => '6.0.2',
+    'version' => '6.0.3',
     'author' => 'Mautic Insights',
     'routes' => [
         'main' => [
