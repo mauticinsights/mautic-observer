@@ -11,6 +11,6 @@ final class InsightsPluginVersionTest extends TestCase
 {
     public function testReadsVersionFromComposerJson(): void
     {
-        $this->assertSame('6.0.0', InsightsPluginVersion::get());
+        $this->assertSame('6.0.1', InsightsPluginVersion::get());
     }
 }
