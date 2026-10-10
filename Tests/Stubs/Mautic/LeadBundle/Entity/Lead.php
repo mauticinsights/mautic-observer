@@ -48,7 +48,7 @@ class Lead
 
     /**
      * Null here = field unset in the test fixture → builder skips the `points` property.
-     * In real Mautic {@see \Mautic\LeadBundle\Entity\Lead::$points} is always `int` (default 0),
+     * In real Mautic {@see Lead::$points} is always `int` (default 0),
      * so production payloads always include `points`. Tests that care about propagation set this explicitly.
      */
     public ?int $stubPoints = null;
