@@ -62,12 +62,8 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
         // All non-anonymous saves (not only isNew): Mautic often updates the same request after first persist; isNew-only missed real creates.
         $payload = $this->contextBuilder->buildPayloadFromLead($lead);
 
-        // Mark new contacts so the API side can distinguish creates from updates for contact counting.
-        if ($event->isNew()) {
-            $existing = $payload['properties'] ?? [];
-            $payload['properties'] = \is_array($existing)
-                ? array_merge($existing, ['is_new' => true])
-                : ['is_new' => true];
+        if ($this->shouldEmitIsNewContactFlag($event, $lead)) {
+            $payload = $this->withIsNewContactFlag($payload);
         }
 
         $this->deferredLeadOutboundQueue->enqueue(LeadEvents::LEAD_POST_SAVE, $payload);
@@ -381,6 +377,62 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
         ksort($out);
 
         return array_keys($out);
+    }
+
+    /**
+     * Insights ingest increments running contact totals only when {@code properties.is_new}
+     * is present on {@see LeadEvents::LEAD_POST_SAVE}. Mautic often fires a follow-up post_save
+     * with {@see LeadEvent::isNew()} false when a lead becomes identified (the first persist was
+     * anonymous and skipped by {@see self::onLeadSave()}) or when identification is applied in
+     * the same request after the initial create save.
+     */
+    private function shouldEmitIsNewContactFlag(LeadEvent $event, Lead $lead): bool
+    {
+        if ($event->isNew()) {
+            return true;
+        }
+
+        return self::changesMarkFirstIdentification($lead->getChanges());
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     *
+     * @return array<string, mixed>
+     */
+    private function withIsNewContactFlag(array $payload): array
+    {
+        $existing = $payload['properties'] ?? [];
+        $payload['properties'] = \is_array($existing)
+            ? array_merge($existing, ['is_new' => true])
+            : ['is_new' => true];
+
+        return $payload;
+    }
+
+    /**
+     * @param array<string, mixed> $changes
+     */
+    private static function changesMarkFirstIdentification(array $changes): bool
+    {
+        if (!isset($changes['dateIdentified'])) {
+            return false;
+        }
+
+        $pair = $changes['dateIdentified'];
+        if (!\is_array($pair)) {
+            return false;
+        }
+
+        $values = array_values($pair);
+        $oldRaw = $values[0] ?? null;
+        $newRaw = $values[1] ?? null;
+
+        if (null === $newRaw || '' === $newRaw || false === $newRaw) {
+            return false;
+        }
+
+        return null === $oldRaw || '' === $oldRaw || false === $oldRaw;
     }
 
     private static function normalizePositiveIntOrNull(mixed $v): ?int

@@ -174,6 +174,25 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         $this->assertArrayNotHasKey('is_new', $rows[0]['properties'] ?? []);
     }
 
+    public function testContactSaveRequestBodyIncludesIsNewWhenDateIdentifiedIsSetOnNonNewSave(): void
+    {
+        [$buffer, $queue, $subscriber] = $this->makeStack();
+
+        $lead = $this->makeFullLead();
+        $lead->stubChanges = [
+            'dateIdentified' => [null, '2026-10-10T12:55:21+00:00'],
+        ];
+
+        $subscriber->onLeadSave(new LeadEvent($lead, isNew: false));
+        $queue->flushTo($buffer);
+
+        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame(LeadEvents::LEAD_POST_SAVE, $rows[0]['event']);
+        $this->assertTrue($rows[0]['properties']['is_new'] ?? false);
+    }
+
     public function testContactSaveIsQueuedViaDeferred(): void
     {
         [$buffer, $queue, $subscriber] = $this->makeStack();
