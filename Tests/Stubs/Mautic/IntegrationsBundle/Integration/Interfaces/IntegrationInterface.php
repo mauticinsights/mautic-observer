@@ -7,7 +7,7 @@ namespace Mautic\IntegrationsBundle\Integration\Interfaces;
 use Mautic\PluginBundle\Entity\Integration;
 
 /**
- * Standalone-test stub matching Mautic {@see \Mautic\IntegrationsBundle\Integration\Interfaces\IntegrationInterface}.
+ * Standalone-test stub matching Mautic {@see IntegrationInterface}.
  */
 interface IntegrationInterface
 {
@@ -19,8 +19,5 @@ interface IntegrationInterface
 
     public function getIntegrationConfiguration(): Integration;
 
-    /**
-     * @return mixed
-     */
     public function setIntegrationConfiguration(Integration $integration);
 }
