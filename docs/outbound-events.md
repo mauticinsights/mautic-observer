@@ -6,7 +6,7 @@ The plugin lives in **`mautic-observer/`** (Symfony bundle `MauticPlugin\MauticI
 
 ## Lead pseudo-events — tags & stage (`LeadInsightsEventSubscriber`)
 
-Mautic 5 does **not** define `LeadEvents::LEAD_TAGS_CHANGE` or `LEAD_STAGE_CHANGE`. The bundle emits these **Insights-only** `event` strings when handling **`LEAD_POST_SAVE`**, after reading **`$lead->getChanges()`** on the entity (not `$event->getChanges()`, which would reset change tracking for core listeners):
+Mautic 5/6 does **not** define `LeadEvents::LEAD_TAGS_CHANGE` or `LEAD_STAGE_CHANGE`. The bundle emits these **Insights-only** `event` strings when handling **`LEAD_POST_SAVE`**, after reading **`$lead->getChanges()`** on the entity (not `$event->getChanges()`, which would reset change tracking for core listeners):
 
 | Outbound `event` | Constant (plugin) | When emitted |
 |------------------|-------------------|--------------|

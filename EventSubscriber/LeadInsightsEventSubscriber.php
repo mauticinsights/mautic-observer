@@ -19,7 +19,7 @@ use MauticPlugin\MauticInsightsBundle\Service\LeadInsightsContextBuilder;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
- * Lead and form activity → main {@see MauticEventBuffer} / {@see DeferredOutboundEventQueue} (POST {@see \MauticPlugin\MauticInsightsBundle\InsightsApiConfig::EVENT_NOTIFY_URL}, JSON root {@code events}). Mautic 5.x.
+ * Lead and form activity → main {@see MauticEventBuffer} / {@see DeferredOutboundEventQueue} (POST {@see \MauticPlugin\MauticInsightsBundle\InsightsApiConfig::EVENT_NOTIFY_URL}, JSON root {@code events}). Mautic 6.x.
  */
 class LeadInsightsEventSubscriber implements EventSubscriberInterface
 {

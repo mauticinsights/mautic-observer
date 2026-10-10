@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Mautic\LeadBundle\Entity;
 
 /**
- * Test double for the Mautic 5 LeadBundle LeadDevice entity.
+ * Test double for the Mautic LeadBundle LeadDevice entity.
  *
  * Only the accessors that {@see \MauticPlugin\MauticInsightsBundle\Service\PageHitPayloadBuilder}
  * reads are exposed; the real Mautic class has many more.

@@ -4,7 +4,7 @@
 
 parameters:
     level: 6
-    phpVersion: 80000
+    phpVersion: 80100
     tmpDir: .phpstan-cache
     # Doctrine DBAL connection params include Mautic-specific keys (e.g. table_prefix) not in generic PHPDoc shapes.
     treatPhpDocTypesAsCertain: false

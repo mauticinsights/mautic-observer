@@ -172,7 +172,7 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
     {
         $captured = [];
         $subscriber = $this->makeSubscriber(
-            version: '5.0.0',
+            version: '6.0.0',
             identifiedContacts: 0,
             senderEmail: 'a@b.com',
             token: 't',
@@ -265,7 +265,7 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
     {
         $captured = [];
         $subscriber = $this->makeSubscriber(
-            version: '5.0.0',
+            version: '6.0.0',
             identifiedContacts: 0,
             senderEmail: 'fallback@example.com',
             token: 'tok',
@@ -285,7 +285,7 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
     {
         $captured = [];
         $subscriber = $this->makeSubscriber(
-            version: '5.0.0',
+            version: '6.0.0',
             identifiedContacts: 0,
             senderEmail: 'core-param@example.com',
             token: 'tok',
@@ -346,7 +346,7 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
         $integration = new Integration(true, [], InsightsApiConfig::NAME, []); // no token
         $subscriber = $this->makeSubscriberWithIntegration(
             integration: $integration,
-            version: '5.0.0',
+            version: '6.0.0',
             identifiedContacts: 0,
             senderEmail: 'x@x.com',
             captured: $captured,
@@ -366,7 +366,7 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
         ]);
         $subscriber = $this->makeSubscriberWithIntegration(
             integration: $integration,
-            version: '5.0.0',
+            version: '6.0.0',
             identifiedContacts: 0,
             senderEmail: 'x@x.com',
             captured: $captured,
@@ -386,7 +386,7 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
         ]);
         $subscriber = $this->makeSubscriberWithIntegration(
             integration: $integration,
-            version: '5.0.0',
+            version: '6.0.0',
             identifiedContacts: 0,
             senderEmail: 'x@x.com',
             captured: $captured,
@@ -410,7 +410,7 @@ final class IntegrationConfigSubscriberFunctionalTest extends TestCase
         ]);
         $subscriber = $this->makeSubscriberWithIntegration(
             integration: $integration,
-            version: '5.0.0',
+            version: '6.0.0',
             identifiedContacts: 0,
             senderEmail: 'x@x.com',
             captured: $captured,

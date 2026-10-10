@@ -7,7 +7,7 @@ namespace Mautic\CoreBundle\Helper;
 final class AppVersion
 {
     public function __construct(
-        private string $version = '5.0.0-test',
+        private string $version = '6.0.0-test',
     ) {
     }
 

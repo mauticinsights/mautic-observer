@@ -68,7 +68,9 @@
         {{ form_row(form.isPublished) }}
         {% if integrationObject is instanceof('\\Mautic\\IntegrationsBundle\\Integration\\Interfaces\\ConfigFormAuthInterface') %}
         <hr />
-        {{ form_row(form.apiKeys) }}
+        {# form_widget: avoid an extra form_row wrapper around the compound AuthConfigType #}
+        {{ form_widget(form.apiKeys) }}
+
             {% if useAuthorizationUrl %}
             <div class="alert alert-warning">
                 {{ integrationObject.getCallbackHelpMessageTranslationKey()|trans }}
@@ -132,7 +134,8 @@
         {% endif %}
 
         {% if useFeatureSettings %}
-            {{ form_row(form.featureSettings.integration) }}
+            {# form_widget: avoid an extra form_row wrapper around the compound FeaturesConfigType #}
+            {{ form_widget(form.featureSettings.integration) }}
         {% endif %}
     </div>
     {% endif %}

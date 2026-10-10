@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Mautic\PageBundle\Entity;
 
 /**
- * Test double for the Mautic 5 PageBundle Redirect entity (trackable short-links).
+ * Test double for the Mautic PageBundle Redirect entity (trackable short-links).
  */
 class Redirect
 {

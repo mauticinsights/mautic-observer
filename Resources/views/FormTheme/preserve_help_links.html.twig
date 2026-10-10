@@ -1,3 +1,36 @@
+{#
+  Integration config form IDs are integration_config_* which contain the substring "config_".
+  Core mautic_form_layout then wrongly applies the Settings→Configuration horizontal
+  (col-md-4/8) layout. Force the stacked full-width layout used for plugin dialogs on M5.
+#}
+{% block form_row %}
+    {% set hasErrors = form.vars.errors|length %}
+    {% set feedbackClass = hasErrors > 0 ? ' has-error' : '' %}
+    <div class="row form-group">
+        <div class="col-xs-12{{ feedbackClass }}">
+            {{ form_label(form, label) }}
+            {{ form_widget(form) }}
+            {{ form_errors(form) }}
+            {{ form_help(form) }}
+        </div>
+    </div>
+{% endblock form_row %}
+
+{% block button_group_row %}
+    {% set hasErrors = form.vars.errors|length %}
+    {% set feedbackClass = (app.request.getMethod() is same as 'POST' and hasErrors > 0) ? ' has-error' : '' %}
+    <div class="row form-group">
+        <div class="col-xs-12{{ feedbackClass }}">
+            {{ form_label(form, label) }}
+            <div class="choice-wrapper">
+                {{ form_widget(form) }}
+                {{ form_errors(form) }}
+            </div>
+            {{ form_help(form) }}
+        </div>
+    </div>
+{% endblock button_group_row %}
+
 {# Overrides Core form_help only when the field sets attr data-mauticinsights-raw-help (see AuthConfigType). #}
 {% block form_help -%}
     {%- if help is not empty or form.vars.attr.help_icon is defined -%}

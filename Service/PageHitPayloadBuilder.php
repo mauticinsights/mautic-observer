@@ -19,7 +19,7 @@ use Mautic\PageBundle\Event\PageHitEvent;
  *     {@code segment_ids}, {@code channel}, {@code ts}) so they are queryable without JSONB indexing.
  *   • Everything else (url, utm, geo, device, clickthrough, ...) lands in {@code properties}.
  *   • All accessors are guarded with {@code method_exists} / type checks because the phpstan
- *     stubs + the Mautic 5.x surface do not always expose the same accessors; graceful degradation
+ *     stubs + the Mautic surface do not always expose the same accessors; graceful degradation
  *     means the subscriber keeps working even when called with a partial Hit stub (tests).
  */
 final class PageHitPayloadBuilder

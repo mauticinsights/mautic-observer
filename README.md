@@ -4,6 +4,8 @@ Observes Mautic contact, email, campaign, form, page and segment events and stre
 
 Package: [`mauticinsights/mautic-observer`](https://packagist.org/packages/mauticinsights/mautic-observer) on Packagist.
 
+**This branch (`6.x`) targets Mautic 6.** Use branch `5.x` / package `^5.0` for Mautic 5.
+
 ## What this plugin does
 
 - Listens to key Mautic events (contacts, email, campaigns, forms, page hits, segments)
@@ -12,19 +14,24 @@ Package: [`mauticinsights/mautic-observer`](https://packagist.org/packages/mauti
 
 ## Requirements
 
-- PHP 8.0+
-- Mautic 5.x
+| Line | PHP | Mautic | Packagist constraint |
+|------|-----|--------|----------------------|
+| Mautic 5 | PHP 8.0+ | Mautic 5.x | `mauticinsights/mautic-observer:^5.0` |
+| Mautic 6 | PHP 8.1+ | Mautic 6.x (`mautic/core-lib` ^6.0) | `mauticinsights/mautic-observer:^6.0` |
+
 - Composer 2.x
 
 ## Installation (Packagist)
 
-Install from the root of your Mautic project — no custom `repositories` entry is required:
+Install from the root of your Mautic project — no custom `repositories` entry is required.
+
+### Mautic 6
 
 ```bash
-composer require mauticinsights/mautic-observer
+composer require mauticinsights/mautic-observer:^6.0
 ```
 
-Pin to the Mautic 5 line (recommended):
+### Mautic 5
 
 ```bash
 composer require mauticinsights/mautic-observer:^5.0
@@ -46,13 +53,21 @@ Then in the Mautic UI:
 3. Enter the Insights API token and required settings
 4. Publish / enable the integration
 
-### Optional: development branch
-
-Only if you need unreleased code from Packagist’s `dev-main`:
+### Optional: development branches
 
 ```bash
-composer require mauticinsights/mautic-observer:dev-main -W
+# Mautic 6
+composer require mauticinsights/mautic-observer:dev-6.x -W
+
+# Mautic 5
+composer require mauticinsights/mautic-observer:dev-5.x -W
 ```
+
+## Local symlink into Mautic
+
+Use [`link.sh`](./link.sh) from this repo to symlink into a local Mautic `plugins/` directory.
+
+**Important:** do not run `composer install` inside the linked plugin directory while Mautic is using it — a nested `vendor/` will break Mautic’s autoloader (`ClassLoader` already in use). Run plugin unit tests from a separate checkout or remove `vendor/` before starting Mautic.
 
 ## Verify it works
 

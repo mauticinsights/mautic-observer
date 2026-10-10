@@ -11,11 +11,11 @@ final class StatusNotifyPayloadTest extends TestCase
 {
     public function testBuildClampsContactCountsAndIncludesSenderEmail(): void
     {
-        $payload = StatusNotifyPayload::build('5.0.0', '2.1.0', -1, -3, 'from@example.org');
+        $payload = StatusNotifyPayload::build('6.0.0', '6.0.0', -1, -3, 'from@example.org');
 
         $this->assertSame([
-            'mautic-version' => '5.0.0',
-            'plugin-version' => '2.1.0',
+            'mautic-version' => '6.0.0',
+            'plugin-version' => '6.0.0',
             'identified-contacts' => 0,
             'anonymous-contacts' => 0,
             'sender-email' => 'from@example.org',
