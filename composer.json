@@ -1,7 +1,7 @@
 {
     "name": "mauticinsights/mautic-observer",
     "description": "Observes Mautic contact, email, campaign, form, page and segment events and streams them to the Mautic Insights ingest API.",
-    "version": "7.0.1",
+    "version": "7.0.2",
     "type": "mautic-plugin",
     "license": "proprietary",
     "keywords": [
@@ -45,11 +45,12 @@
         }
     },
     "scripts": {
-        "cs-fixer": "../../bin/php-cs-fixer fix --config .php-cs-fixer.php --show-progress dots -v",
-        "phpstan": "../../bin/phpstan analyse . --memory-limit=1G -c phpstan.neon.dist",
-        "test": "../../bin/phpunit -d memory_limit=2048M --configuration phpunit.xml.dist --fail-on-warning",
-        "all": [
-            "@cs-fixer",
+        "cs-fixer": "php-cs-fixer fix --config .php-cs-fixer.php --show-progress dots -v",
+        "cs-check": "php-cs-fixer fix --config .php-cs-fixer.php --dry-run --diff",
+        "test": "phpunit -d memory_limit=2048M --configuration phpunit.xml.dist --fail-on-warning",
+        "phpstan": "phpstan analyse -c phpstan.standalone.neon.dist --no-progress --memory-limit=512M",
+        "ci": [
+            "@cs-check",
             "@phpstan",
             "@test"
         ]
