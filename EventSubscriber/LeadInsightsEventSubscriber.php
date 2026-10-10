@@ -56,6 +56,15 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
 
         $lead = $event->getLead();
         if ($lead->isAnonymous()) {
+            // Count-only: new anonymous → +1 on Insights instance totals. No profile/segment payload.
+            // Updates of existing anonymous leads are ignored (no KPI impact).
+            if ($event->isNew()) {
+                $this->deferredLeadOutboundQueue->enqueue(
+                    LeadEvents::LEAD_POST_SAVE,
+                    $this->buildAnonymousCountPayload($lead, ['is_new' => true])
+                );
+            }
+
             return;
         }
 
@@ -78,6 +87,11 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
 
         $lead = $event->getLead();
         if ($lead->isAnonymous()) {
+            $this->deferredLeadOutboundQueue->enqueue(
+                LeadEvents::LEAD_POST_DELETE,
+                $this->buildAnonymousCountPayload($lead)
+            );
+
             return;
         }
 
@@ -109,6 +123,14 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
 
         $loser = $event->getLoser();
         if ($loser->isAnonymous()) {
+            // Count-only: loser was anonymous → −1 anonymous on Insights. No profile soft-delete payload.
+            $this->deferredLeadOutboundQueue->enqueue(
+                LeadEvents::LEAD_POST_MERGE,
+                $this->buildAnonymousCountPayload($loser, [
+                    'survivor_id' => $event->getVictor()->getId(),
+                ])
+            );
+
             return;
         }
 
@@ -406,6 +428,29 @@ class LeadInsightsEventSubscriber implements EventSubscriberInterface
         $payload['properties'] = \is_array($existing)
             ? array_merge($existing, ['is_new' => true])
             : ['is_new' => true];
+
+        return $payload;
+    }
+
+    /**
+     * Minimal outbound body for anonymous lifecycle: Insights adjusts instance totals / snapshots only
+     * and must not create {@code mautic_contact_profile} rows (no email/name/segment fields).
+     *
+     * @param array<string, mixed> $extraProperties
+     *
+     * @return array{channel: string, contact_id?: int, properties: array<string, mixed>}
+     */
+    private function buildAnonymousCountPayload(Lead $lead, array $extraProperties = []): array
+    {
+        $payload = [
+            'channel' => 'contact',
+            'properties' => array_merge(['is_anonymous' => true], $extraProperties),
+        ];
+
+        $id = $this->contextBuilder->resolvePositiveContactId($lead);
+        if (null !== $id) {
+            $payload['contact_id'] = $id;
+        }
 
         return $payload;
     }

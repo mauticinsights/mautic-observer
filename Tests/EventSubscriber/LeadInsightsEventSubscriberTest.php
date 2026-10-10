@@ -215,7 +215,7 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         $this->assertSame(LeadEvents::LEAD_POST_SAVE, $rows[0]['event']);
     }
 
-    public function testAnonymousSaveIsIgnored(): void
+    public function testAnonymousNewSaveEmitsCountOnlyPayload(): void
     {
         [$buffer, $queue, $subscriber] = $this->makeStack();
 
@@ -224,6 +224,27 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         $anon->stubId = 1;
 
         $subscriber->onLeadSave(new LeadEvent($anon, true));
+        $queue->flushTo($buffer);
+
+        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
+        $this->assertCount(1, $rows);
+        $this->assertSame(LeadEvents::LEAD_POST_SAVE, $rows[0]['event']);
+        $this->assertSame('contact', $rows[0]['channel']);
+        $this->assertSame(1, $rows[0]['contact_id']);
+        $this->assertSame(['is_anonymous' => true, 'is_new' => true], $rows[0]['properties']);
+        $this->assertArrayNotHasKey('segment_ids', $rows[0]);
+        $this->assertArrayNotHasKey('email', $rows[0]['properties']);
+    }
+
+    public function testAnonymousUpdateSaveIsIgnored(): void
+    {
+        [$buffer, $queue, $subscriber] = $this->makeStack();
+
+        $anon = new Lead();
+        $anon->anonymous = true;
+        $anon->stubId = 1;
+
+        $subscriber->onLeadSave(new LeadEvent($anon, false));
         $queue->flushTo($buffer);
 
         $this->assertSame([], $this->flushBufferAndGetNormalizedEventRows($buffer));
@@ -294,7 +315,7 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         $this->assertSame(LeadEvents::LEAD_POST_DELETE, $rows[0]['event']);
     }
 
-    public function testAnonymousDeleteIsIgnored(): void
+    public function testAnonymousDeleteEmitsCountOnlyPayload(): void
     {
         [$buffer, $queue, $subscriber] = $this->makeStack();
 
@@ -305,7 +326,11 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         $subscriber->onLeadDelete(new LeadEvent($anon, false));
         $queue->flushTo($buffer);
 
-        $this->assertSame([], $this->flushBufferAndGetNormalizedEventRows($buffer));
+        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
+        $this->assertCount(1, $rows);
+        $this->assertSame(LeadEvents::LEAD_POST_DELETE, $rows[0]['event']);
+        $this->assertSame(1, $rows[0]['contact_id']);
+        $this->assertSame(['is_anonymous' => true], $rows[0]['properties']);
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -364,7 +389,7 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         $this->assertSame(LeadEvents::LEAD_POST_MERGE, $rows[0]['event']);
     }
 
-    public function testAnonymousMergeLoserIsIgnored(): void
+    public function testAnonymousMergeLoserEmitsCountOnlyPayload(): void
     {
         [$buffer, $queue, $subscriber] = $this->makeStack();
 
@@ -377,7 +402,11 @@ final class LeadInsightsEventSubscriberTest extends TestCase
         $subscriber->onLeadMerge(new LeadMergeEvent($winner, $anonLoser));
         $queue->flushTo($buffer);
 
-        $this->assertSame([], $this->flushBufferAndGetNormalizedEventRows($buffer));
+        $rows = $this->flushBufferAndGetNormalizedEventRows($buffer);
+        $this->assertCount(1, $rows);
+        $this->assertSame(LeadEvents::LEAD_POST_MERGE, $rows[0]['event']);
+        $this->assertSame(1, $rows[0]['contact_id']);
+        $this->assertSame(['is_anonymous' => true, 'survivor_id' => 2], $rows[0]['properties']);
     }
 
     public function testMergeLoserWithMinimalPropertiesEmitsEvent(): void
