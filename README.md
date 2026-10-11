@@ -1,16 +1,6 @@
 # Mautic Insights Observer
 
-Observes Mautic contact, email, campaign, form, page and segment events and streams them to the [Mautic Insights](https://packagist.org/packages/mauticinsights/mautic-observer) ingest API.
-
-Package: [`mauticinsights/mautic-observer`](https://packagist.org/packages/mauticinsights/mautic-observer) on Packagist.
-
-**This branch (`7.x` / `main`) targets Mautic 7.** Use branch `6.x` / package `^6` for Mautic 6, or `5.x` / `^5` for Mautic 5.
-
-## What this plugin does
-
-- Listens to key Mautic events (contacts, email, campaigns, forms, page hits, segments)
-- Buffers and sends outbound payloads to the Insights API (`/event`, `/status`)
-- Supports bulk sync on enable, segment reconcile after batch rebuilds, and a Health panel in the plugin UI
+Observes Mautic contact, email, campaign, form, page and segment events and streams them to the [Mautic Insights](https://mauticinsights.com/) ingest API.
 
 ## Requirements
 
@@ -60,19 +50,6 @@ Composer installs the bundle into `plugins/MauticInsightsBundle` (`extra.install
    GitHub ZIPs usually unpack to a folder like `mautic-observer-7.0.4` — rename that folder to `MauticInsightsBundle` (or extract so the contents land directly in `plugins/MauticInsightsBundle/`).
 3. In the Mautic UI, open **Settings → Plugins** and click **Install/Upgrade Plugins** (instead of `composer require`).
 
-### Alternative: install from GitHub (VCS)
-
-Only needed if you want a branch or unreleased commit. Add to the `repositories` section of Mautic’s `composer.json`:
-
-```json
-{
-  "type": "vcs",
-  "url": "https://github.com/mauticinsights/mautic-observer"
-}
-```
-
-Then use the development constraints below.
-
 ### After install
 
 If you have CLI access:
@@ -88,6 +65,19 @@ Then in the Mautic UI:
 2. Find **Mautic Insights**
 3. Enter the Insights API token and required settings
 4. Publish / enable the integration
+
+### Alternative: install from GitHub (VCS)
+
+Only needed if you want a branch or unreleased commit. Add to the `repositories` section of Mautic’s `composer.json`:
+
+```json
+{
+  "type": "vcs",
+  "url": "https://github.com/mauticinsights/mautic-observer"
+}
+```
+
+Then use the development constraints below.
 
 ### Optional: development branches
 
